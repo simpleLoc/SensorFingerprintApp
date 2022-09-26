@@ -1,0 +1,6 @@
+[submodule "libSmartphoneSensors"]
+	path = libSmartphoneSensors
+	url = https://github.com/simpleLoc/libSmartphoneSensors.git
+[submodule "libSmartphoneIndoorMap"]
+	path = libSmartphoneIndoorMap
+	url = https://github.com/simpleLoc/libSmartphoneIndoorMap.git

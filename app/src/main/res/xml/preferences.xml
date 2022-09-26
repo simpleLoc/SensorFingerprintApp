@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <EditTextPreference
+        app:key="prefWifiScanIntervalMSec"
+        app:defaultValue="0"
+        app:singleLine="true"
+        app:summary="Interval (ms) at which Wifi-Scans are attempted. 0 will attempt to start a new scan as soon as the previous is done."
+        app:title="Wifi Scan Interval (ms)" />
+    <EditTextPreference
+        app:defaultValue="AA:BB:CC:DD:EE:FF"
+        app:key="prefDecawaveUWBTagMacAddress"
+        app:singleLine="true"
+        app:title="Decawave UWB Tag MAC-Address" />
+
+</PreferenceScreen>

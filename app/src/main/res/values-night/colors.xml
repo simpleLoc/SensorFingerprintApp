@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="wallColor">#88FFFFFF</color>
+    <color name="unseenColor">#CCFF0000</color>
+    <color name="seenColor">#FF00FF00</color>
+</resources>
