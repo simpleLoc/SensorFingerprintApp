@@ -26,6 +26,7 @@ import de.fhws.indoor.libsmartphoneindoormap.model.Map;
 import de.fhws.indoor.libsmartphoneindoormap.parser.MapSeenSerializer;
 import de.fhws.indoor.libsmartphoneindoormap.parser.XMLMapParser;
 import de.fhws.indoor.libsmartphoneindoormap.renderer.ColorScheme;
+import de.fhws.indoor.libsmartphoneindoormap.renderer.IMapEventListener;
 import de.fhws.indoor.libsmartphoneindoormap.renderer.MapView;
 import de.fhws.indoor.libsmartphonesensors.SensorManager;
 import de.fhws.indoor.libsmartphonesensors.SensorType;
@@ -41,6 +42,7 @@ public class MainActivity extends AppCompatActivity {
 
     private MapView mapView = null;
     private MapView.ViewConfig mapViewConfig = new MapView.ViewConfig();
+    private IMapEventListener mapEventListener = null;
     public static Map currentMap = null;
     private final SensorManager sensorManager = new SensorManager();
     // sensorManager status
@@ -59,6 +61,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // setup map view
         mapView = findViewById(R.id.MapView);
         mapView.setColorScheme(new ColorScheme(R.color.wallColor, R.color.unseenColor, R.color.seenColor));
         mPrefs = getSharedPreferences(MAP_PREFERENCES, MODE_PRIVATE);
@@ -86,6 +89,30 @@ public class MainActivity extends AppCompatActivity {
         lblCntWifi.setOnClickListener(wifiClickListener);
         lblCntWifiRTT.setOnClickListener(wifiClickListener);
 
+        mapEventListener = new IMapEventListener() {
+            @Override
+            public void onTap(float[] mapPosition) {
+
+            }
+
+            @Override
+            public void onLongPress(float[] mapPosition) {
+
+            }
+
+            @Override
+            public void onDragStart(float[] mapPosition) {
+
+            }
+
+            @Override
+            public void onDragEnd(float[] mapPosition) {
+
+            }
+        };
+        mapView.addEventListener(mapEventListener);
+
+        // setup settings view
         Button btnSettings = findViewById(R.id.btnSettings);
         btnSettings.setOnClickListener(new View.OnClickListener() {
             @Override
