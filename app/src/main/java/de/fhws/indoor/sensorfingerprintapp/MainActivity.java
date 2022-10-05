@@ -438,6 +438,8 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        Toast.makeText(getApplicationContext(), "Fingerprints exported", Toast.LENGTH_LONG).show();
+
         // conditionally enable buttons again
         setBtnStartEnabled();
         setBtnExportEnabled();
