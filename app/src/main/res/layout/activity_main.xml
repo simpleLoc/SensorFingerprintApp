@@ -142,6 +142,12 @@
         app:layout_constraintEnd_toEndOf="parent">
 
         <Button
+            android:id="@+id/btnExport"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/export_button_text" />
+
+        <Button
             android:id="@+id/btnStart"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

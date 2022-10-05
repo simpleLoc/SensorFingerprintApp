@@ -1,8 +1,11 @@
 package de.fhws.indoor.sensorfingerprintapp;
 
+import android.app.AlertDialog;
 import android.content.ContentResolver;
+import android.content.DialogInterface;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,6 +23,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Objects;
 
 import de.fhws.indoor.libsmartphoneindoormap.parser.XMLMapParser;
 import de.fhws.sensorfingerprintapp.R;
@@ -33,19 +37,15 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     ActivityResultLauncher<String> mGetContent = registerForActivityResult(
         new ActivityResultContracts.GetContent(),
             uri -> {
-                Uri dst = Uri.fromFile(new File(getActivity().getExternalFilesDir(null), MainActivity.MAP_URI));
-                try {
-                    copyMapToAppStorage(uri, dst);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+                builder
+                        .setTitle(R.string.select_map_dialog_title)
+                        .setMessage(R.string.select_map_dialog_msg)
+                        .setNegativeButton(R.string.select_map_dialog_negative, null)
+                        .setPositiveButton(R.string.select_map_dialog_positive, (DialogInterface dialog, int id) -> selectMap(uri));
 
-                try {
-                    XMLMapParser parser = new XMLMapParser(getContext());
-                    MainActivity.currentMap = parser.parse(mContentResolver.openInputStream(dst));
-                } catch (FileNotFoundException e) {
-                    e.printStackTrace();
-                }
+                AlertDialog dialog = builder.create();
+                dialog.show();
             });
 
 
@@ -79,6 +79,36 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     private void handleSelectMap() {
         mContentResolver = getActivity().getContentResolver();
         mGetContent.launch("*/*");
+    }
+
+    private void selectMap(Uri uri) {
+        // delete fingerprint files that were recorded with the previous map
+        deleteTmpFingerprintFiles();
+
+        Uri dst = Uri.fromFile(new File(getActivity().getExternalFilesDir(null), MainActivity.MAP_URI));
+        try {
+            copyMapToAppStorage(uri, dst);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            XMLMapParser parser = new XMLMapParser(getContext());
+            MainActivity.currentMap = parser.parse(mContentResolver.openInputStream(dst));
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void deleteTmpFingerprintFiles() {
+        File[] files = new File(requireActivity().getExternalFilesDir(null), MainActivity.FINGERPRINTS_TMP_DIR).listFiles();
+        if (files != null) {
+            for (File fpFile : files) {
+                if (!fpFile.delete()) {
+                    Log.w(MainActivity.STREAM_TAG, "Could not delete file: " + Uri.fromFile(fpFile));
+                }
+            }
+        }
     }
 
     // To guarantee that the app still has access to the chosen map, we copy

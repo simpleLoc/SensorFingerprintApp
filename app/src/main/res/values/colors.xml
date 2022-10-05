@@ -10,4 +10,5 @@
     <color name="wallColor">#33000000</color>
     <color name="unseenColor">#CCFF0000</color>
     <color name="seenColor">#FF00FF00</color>
+    <color name="selectedColor">#FFEB3B</color>
 </resources>
