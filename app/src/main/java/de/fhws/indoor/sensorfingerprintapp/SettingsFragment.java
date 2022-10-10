@@ -23,7 +23,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Objects;
 
 import de.fhws.indoor.libsmartphoneindoormap.parser.XMLMapParser;
 import de.fhws.sensorfingerprintapp.R;
@@ -101,11 +100,16 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     }
 
     private void deleteTmpFingerprintFiles() {
-        File[] files = new File(requireActivity().getExternalFilesDir(null), MainActivity.FINGERPRINTS_TMP_DIR).listFiles();
+        deleteTmpFingerprintFiles(MainActivity.FINGERPRINTS_TMP_DIR_BLE);
+        deleteTmpFingerprintFiles(MainActivity.FINGERPRINTS_TMP_DIR_WIFI);
+    }
+
+    private void deleteTmpFingerprintFiles(String tmpFileDir) {
+        File[] files = new File(requireActivity().getExternalFilesDir(null), tmpFileDir).listFiles();
         if (files != null) {
             for (File fpFile : files) {
                 if (!fpFile.delete()) {
-                    Log.w(MainActivity.STREAM_TAG, "Could not delete file: " + Uri.fromFile(fpFile));
+                    Log.w(MainActivity.STREAM_TAG, "Cannot delete file: " + Uri.fromFile(fpFile));
                 }
             }
         }
