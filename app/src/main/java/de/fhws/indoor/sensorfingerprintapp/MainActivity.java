@@ -25,6 +25,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Timer;
@@ -215,7 +216,7 @@ public class MainActivity extends AppCompatActivity {
     private IMapEventListener mapEventListener = null;
     public static Map currentMap = null;
 
-    private FingerprintPosition selectedFingerprint = null;
+    private Fingerprint selectedFingerprint = null;
 
     private final SensorManager sensorManager = new SensorManager();
     // sensorManager status
@@ -311,7 +312,7 @@ public class MainActivity extends AppCompatActivity {
                     mapView.invalidate();
                 }
 
-                FingerprintPosition fp = mapView.findNearestFingerprint(mapPosition, 1.0f);
+                Fingerprint fp = mapView.findNearestFingerprint(mapPosition, 1.0f);
                 if (fp != null) {
                     selectedFingerprint = fp;
                     fp.selected = true;
@@ -594,6 +595,11 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (currentMap != null) {
+            // TODO: remove insertion of test data
+            FingerprintPath testPath = new FingerprintPath();
+            testPath.fingerprintNames = new ArrayList<>(Arrays.asList("2.20", "2.21"));
+            Objects.requireNonNull(currentMap.getFloors().get("2. Stock")).addFingerprint(testPath);
+
             currentMap.setSerializer(new MapSeenSerializer(getApplicationContext()));
             // TODO: may also recover .dat.tmp files here?
             // load recording states from fingerprints
