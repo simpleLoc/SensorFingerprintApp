@@ -25,7 +25,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 import de.fhws.indoor.libsmartphoneindoormap.parser.XMLMapParser;
-import de.fhws.sensorfingerprintapp.R;
+import de.fhws.indoor.sensorfingerprintapp.R;
 
 /**
  * @author Markus Ebner

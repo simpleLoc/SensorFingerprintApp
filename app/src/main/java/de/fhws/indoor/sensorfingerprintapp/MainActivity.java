@@ -1,8 +1,5 @@
 package de.fhws.indoor.sensorfingerprintapp;
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.preference.PreferenceManager;
-
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
@@ -16,6 +13,9 @@ import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.preference.PreferenceManager;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -32,6 +32,7 @@ import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLong;
 
 import de.fhws.indoor.libsmartphoneindoormap.model.Fingerprint;
+import de.fhws.indoor.libsmartphoneindoormap.model.FingerprintPath;
 import de.fhws.indoor.libsmartphoneindoormap.model.FingerprintPosition;
 import de.fhws.indoor.libsmartphoneindoormap.model.Floor;
 import de.fhws.indoor.libsmartphoneindoormap.model.Map;
@@ -45,7 +46,7 @@ import de.fhws.indoor.libsmartphonesensors.SensorManager;
 import de.fhws.indoor.libsmartphonesensors.SensorType;
 import de.fhws.indoor.libsmartphonesensors.sensors.DecawaveUWB;
 import de.fhws.indoor.libsmartphonesensors.sensors.WiFi;
-import de.fhws.sensorfingerprintapp.R;
+import de.fhws.indoor.sensorfingerprintapp.R;
 
 /**
  * @author Steffen Kastner
@@ -82,18 +83,27 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        public void startRecording(FingerprintPosition selectedFingerprint) throws FileNotFoundException {
+        public void startRecording(Fingerprint selectedFingerprint) throws FileNotFoundException {
+            assert recordingFingerprint == null;
             assert tmpFingerprintsDir != null;
             assert tmpFingerprintsFile == null;
             assert tmpFingerprintsOutputStream == null;
 
-            tmpFingerprintsFile = new File(tmpFingerprintsDir,
-                    selectedFingerprint.position.toString() + FINGERPRINTS_TMP_EXTENSION);
+            // check if that fingerprint was already recorded
+            FingerprintRecordings.Recording recording = fingerprintRecordings.getRecording(selectedFingerprint);
+            if (recording == null) {
+                recording = new FingerprintRecordings.Recording(selectedFingerprint.name, null);
+                fingerprintRecordings.addRecording(recording);
+            }
+
+            tmpFingerprintsFile = new File(tmpFingerprintsDir,recording.getId().toString() + FINGERPRINTS_TMP_EXTENSION);
             tmpFingerprintsOutputStream = getContentResolver().openOutputStream(Uri.fromFile(tmpFingerprintsFile), "wt");
             tmpFingerprintCount = 0;
+            recordingFingerprint = selectedFingerprint;
         }
 
-        public void stopRecording(FingerprintPosition recordingFingerprint) throws IOException {
+        public void stopRecording(Fingerprint recordingFingerprint) throws IOException {
+            assert recordingFingerprint != null;
             assert tmpFingerprintsFile != null;
             assert tmpFingerprintsOutputStream != null;
 
@@ -101,17 +111,41 @@ public class MainActivity extends AppCompatActivity {
             tmpFingerprintsOutputStream.close();
             tmpFingerprintsOutputStream = null;
 
+            // get recording from database
+            FingerprintRecordings.Recording recording = fingerprintRecordings.getRecording(recordingFingerprint);
+            assert recording != null;
+
             // open output stream as input stream
-            File outFile = new File(tmpFingerprintsDir, recordingFingerprint.position.toString() + FINGERPRINTS_EXTENSION);
-            try (InputStream in = getContentResolver().openInputStream(Uri.fromFile(tmpFingerprintsFile))){
+            File outFile = new File(tmpFingerprintsDir, recording.getId().toString() + FINGERPRINTS_EXTENSION);
+            try (InputStream in = getContentResolver().openInputStream(Uri.fromFile(tmpFingerprintsFile))) {
                 try (OutputStream out = getContentResolver().openOutputStream(Uri.fromFile(outFile), "wt")) {
                     // write header
-                    out.write(String.format(Locale.US,
-                            "[fingerprint]\n" +
-                                    "pos: %s\n" +
-                                    "num: %d\n",
-                            recordingFingerprint.position.toString(),
-                            tmpFingerprintCount).getBytes(StandardCharsets.UTF_8));
+                    if (recordingFingerprint instanceof FingerprintPosition) {
+                        out.write(String
+                                .format(Locale.US,
+                                        "%s\nname=%s\n\n",
+                                        FingerprintFileParser.FINGERPRINT_POINT_TAG,
+                                        recordingFingerprint.name)
+                                .getBytes(StandardCharsets.UTF_8));
+                    } else if (recordingFingerprint instanceof FingerprintPath) {
+                        FingerprintPath path = (FingerprintPath) recordingFingerprint;
+
+                        StringBuilder points = new StringBuilder("[");
+                        for (String point : path.fingerprintNames) {
+                            points.append(String.format(Locale.US, "\"%s\", ", point));
+                        }
+                        // delete last comma and insert closing bracket
+                        points.delete(points.length()-2, points.length()-1);
+                        points.append("]");
+
+                        out.write(String
+                                .format(Locale.US,
+                                        "%s\npoints=%s\n\n",
+                                        FingerprintFileParser.FINGERPRINT_POINT_TAG,
+                                        points.toString())
+                                .getBytes(StandardCharsets.UTF_8));
+                    }
+
 
                     // append content
                     appendToOutputStream(in, out);
@@ -195,9 +229,9 @@ public class MainActivity extends AppCompatActivity {
     private Button btnExport = null;
     private Button btnSettings = null;
 
-    private FingerprintFileLocations fingerprintFileLocationsBle;
-    private FingerprintFileLocations fingerprintFileLocationsWifi;
-    private FingerprintPosition recordingFingerprint = null;
+    private FingerprintFileLocations fingerprintFileLocations;
+    private final FingerprintRecordings fingerprintRecordings = new FingerprintRecordings();
+    private Fingerprint recordingFingerprint = null;
 
     private FilenameFilter tmpFingerprintFileFilter = new FilenameFilter() {
         @Override
@@ -219,7 +253,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         // create output locations
-        fingerprintFileLocationsBle = new FingerprintFileLocations("fingerprints_ble.dat", FINGERPRINTS_TMP_DIR);
+        fingerprintFileLocations = new FingerprintFileLocations("fingerprints_ble.dat", FINGERPRINTS_TMP_DIR);
 
         // setup export button
         btnExport = findViewById(R.id.btnExport);
@@ -377,11 +411,11 @@ public class MainActivity extends AppCompatActivity {
             String[] splitCSV = csv.split(";");
             switch (id) {
                 case IBEACON:
-                    fingerprintFileLocationsBle.write(timestamp, toMACWithDots(splitCSV[0]), splitCSV[1]);
+                    fingerprintFileLocations.write(timestamp, toMACWithDots(splitCSV[0]), splitCSV[1]);
                     break;
 
                 case WIFI:
-                    fingerprintFileLocationsWifi.write(timestamp, toMACWithDots(splitCSV[0]), splitCSV[2]);
+                    fingerprintFileLocations.write(timestamp, toMACWithDots(splitCSV[0]), splitCSV[2]);
                     break;
 
                 default:
@@ -411,12 +445,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startRecording() {
-        assert fingerprintFileLocationsBle != null;
-        assert fingerprintFileLocationsWifi != null;
+        assert fingerprintFileLocations != null;
         assert selectedFingerprint != null;
         try {
-            fingerprintFileLocationsBle.startRecording(selectedFingerprint);
-            fingerprintFileLocationsWifi.startRecording(selectedFingerprint);
+            fingerprintFileLocations.startRecording(selectedFingerprint);
 
             setupSensors();
             btnStart.setText(R.string.stop_button_text);
@@ -431,8 +463,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void stopRecording() {
-        assert fingerprintFileLocationsBle != null;
-        assert fingerprintFileLocationsWifi != null;
+        assert fingerprintFileLocations != null;
         assert recordingFingerprint != null;
         try {
             sensorManager.stop(this);
@@ -440,8 +471,7 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
         try {
-            fingerprintFileLocationsBle.stopRecording(recordingFingerprint);
-            fingerprintFileLocationsWifi.stopRecording(recordingFingerprint);
+            fingerprintFileLocations.stopRecording(recordingFingerprint);
 
             recordingFingerprint.recorded = true;
             mapView.invalidate();
@@ -463,10 +493,9 @@ public class MainActivity extends AppCompatActivity {
 
     private void setBtnExportEnabled() {
         btnExport.setEnabled(
-                (
-                        Objects.requireNonNull(fingerprintFileLocationsBle.tmpFingerprintsDir.listFiles()).length != 0 ||
-                        Objects.requireNonNull(fingerprintFileLocationsWifi.tmpFingerprintsDir.listFiles()).length != 0
-                ) && recordingFingerprint == null);
+                Objects.requireNonNull(fingerprintFileLocations.tmpFingerprintsDir.listFiles()).length != 0
+                && recordingFingerprint == null
+        );
     }
 
     private void setBtnSettingsEnabled() {
@@ -479,8 +508,7 @@ public class MainActivity extends AppCompatActivity {
         btnExport.setEnabled(false);
         btnSettings.setEnabled(false);
 
-        fingerprintFileLocationsBle.export();
-        fingerprintFileLocationsWifi.export();
+        fingerprintFileLocations.export();
 
         Toast.makeText(getApplicationContext(), "Fingerprints exported", Toast.LENGTH_LONG).show();
 
@@ -564,11 +592,36 @@ public class MainActivity extends AppCompatActivity {
         if (currentMap != null) {
             currentMap.setSerializer(new MapSeenSerializer(getApplicationContext()));
             // TODO: may also recover .dat.tmp files here?
-            // load recording states from ble fingerprints
-            File[] files = fingerprintFileLocationsBle.tmpFingerprintsDir.listFiles(fingerprintFileFilter);
+            // load recording states from fingerprints
+            File[] files = fingerprintFileLocations.tmpFingerprintsDir.listFiles(fingerprintFileFilter);
             if (files != null) {
+                // add recordings to internal structure
                 for (File fpFile : files) {
-                    // TODO: parse file header here and insert to recordings
+                    try {
+                        FingerprintFileParser fingerprintFileParser = new FingerprintFileParser(
+                                getContentResolver().openInputStream(Uri.fromFile(fpFile)),
+                                FingerprintFileParser.WhatToParse.ONLY_HEADER);
+                        ArrayList<FingerprintRecordings.Recording> recordingsInFile = fingerprintFileParser.parse();
+                        for (FingerprintRecordings.Recording r : recordingsInFile) {
+                            // set recording file of recording since it already exists
+                            r.setRecordingFile(fpFile);
+                            fingerprintRecordings.addRecording(r);
+                        }
+                    } catch (FileNotFoundException e) {
+                        Log.e(STREAM_TAG, e.toString());
+                        Toast.makeText(getApplicationContext(), "Cannot open input file: " + Uri.fromFile(fpFile), Toast.LENGTH_LONG).show();
+                    } catch (IOException e) {
+                        Log.e(STREAM_TAG, e.toString());
+                        Toast.makeText(getApplicationContext(), "Cannot parse input file: " + Uri.fromFile(fpFile), Toast.LENGTH_LONG).show();
+                    }
+                }
+
+                for (Floor floor : currentMap.getFloors().values()) {
+                    for (Fingerprint fp : floor.getFingerprints().values()) {
+                        if (fingerprintRecordings.contains(fp)) {
+                            fp.recorded = true;
+                        }
+                    }
                 }
             }
         }
