@@ -33,7 +33,8 @@ public class FingerprintRecordings {
             for (String name :  fingerprintNames) {
                 sb.append(String.format(Locale.US, "%s -> ", name));
             }
-            sb.delete(sb.length()-3, sb.length()-1);
+            // delete last arrow
+            sb.delete(sb.length()-4, sb.length());
             this.fingerprintName = sb.toString();
 
             this.fingerprintNames = fingerprintNames;
