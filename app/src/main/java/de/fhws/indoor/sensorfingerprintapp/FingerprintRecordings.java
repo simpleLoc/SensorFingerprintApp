@@ -8,7 +8,7 @@ import de.fhws.indoor.libsmartphoneindoormap.model.Fingerprint;
 public class FingerprintRecordings {
     private final HashMap<String, Recording> recordings = new HashMap<>();
 
-    public class Recording {
+    public static class Recording {
         Fingerprint fingerprint = null;
         File recordingFile = null;
 

@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'de.fhws.sensorfingerprintapp'
+    namespace 'de.fhws.indoor.sensorfingerprintapp'
     compileSdk 32
 
     defaultConfig {
-        applicationId "de.fhws.sensorfingerprintapp"
+        applicationId "de.fhws.indoor.sensorfingerprintapp"
         minSdk 29
         targetSdk 32
         versionCode 1
