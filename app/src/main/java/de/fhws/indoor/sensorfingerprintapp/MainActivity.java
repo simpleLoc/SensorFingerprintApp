@@ -595,12 +595,6 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (currentMap != null) {
-            // TODO: remove insertion of test data
-            FingerprintPath testPath = new FingerprintPath();
-            testPath.name = "2.20 -> 2.21";
-            testPath.fingerprintNames = new ArrayList<>(Arrays.asList("2.20", "2.21"));
-            Objects.requireNonNull(currentMap.getFloors().get("2. Stock")).addFingerprint(testPath);
-
             currentMap.setSerializer(new MapSeenSerializer(getApplicationContext()));
             // TODO: may also recover .dat.tmp files here?
             // load recording states from fingerprints
