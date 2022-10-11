@@ -100,8 +100,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     }
 
     private void deleteTmpFingerprintFiles() {
-        deleteTmpFingerprintFiles(MainActivity.FINGERPRINTS_TMP_DIR_BLE);
-        deleteTmpFingerprintFiles(MainActivity.FINGERPRINTS_TMP_DIR_WIFI);
+        deleteTmpFingerprintFiles(MainActivity.FINGERPRINTS_TMP_DIR);
     }
 
     private void deleteTmpFingerprintFiles(String tmpFileDir) {

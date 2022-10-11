@@ -32,6 +32,7 @@ import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLong;
 
 import de.fhws.indoor.libsmartphoneindoormap.model.Fingerprint;
+import de.fhws.indoor.libsmartphoneindoormap.model.FingerprintPosition;
 import de.fhws.indoor.libsmartphoneindoormap.model.Floor;
 import de.fhws.indoor.libsmartphoneindoormap.model.Map;
 import de.fhws.indoor.libsmartphoneindoormap.model.Vec2;
@@ -52,8 +53,7 @@ import de.fhws.sensorfingerprintapp.R;
 public class MainActivity extends AppCompatActivity {
     public static final String STREAM_TAG = "FileStream";
     public static final String MAP_URI = "map.xml";
-    public static final String FINGERPRINTS_TMP_DIR_BLE = "fingerprints_ble";
-    public static final String FINGERPRINTS_TMP_DIR_WIFI = "fingerprints_wifi";
+    public static final String FINGERPRINTS_TMP_DIR = "fingerprints";
     public static final String FINGERPRINTS_TMP_EXTENSION = ".dat.tmp";
     public static final String FINGERPRINTS_EXTENSION = ".dat";
     public static final String MAP_PREFERENCES = "MAP_PREFERENCES";
@@ -82,7 +82,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        public void startRecording(Fingerprint selectedFingerprint) throws FileNotFoundException {
+        public void startRecording(FingerprintPosition selectedFingerprint) throws FileNotFoundException {
             assert tmpFingerprintsDir != null;
             assert tmpFingerprintsFile == null;
             assert tmpFingerprintsOutputStream == null;
@@ -93,7 +93,7 @@ public class MainActivity extends AppCompatActivity {
             tmpFingerprintCount = 0;
         }
 
-        public void stopRecording(Fingerprint recordingFingerprint) throws IOException {
+        public void stopRecording(FingerprintPosition recordingFingerprint) throws IOException {
             assert tmpFingerprintsFile != null;
             assert tmpFingerprintsOutputStream != null;
 
@@ -177,7 +177,7 @@ public class MainActivity extends AppCompatActivity {
     private IMapEventListener mapEventListener = null;
     public static Map currentMap = null;
 
-    private Fingerprint selectedFingerprint = null;
+    private FingerprintPosition selectedFingerprint = null;
 
     private final SensorManager sensorManager = new SensorManager();
     // sensorManager status
@@ -197,7 +197,7 @@ public class MainActivity extends AppCompatActivity {
 
     private FingerprintFileLocations fingerprintFileLocationsBle;
     private FingerprintFileLocations fingerprintFileLocationsWifi;
-    private Fingerprint recordingFingerprint = null;
+    private FingerprintPosition recordingFingerprint = null;
 
     private FilenameFilter tmpFingerprintFileFilter = new FilenameFilter() {
         @Override
@@ -219,8 +219,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         // create output locations
-        fingerprintFileLocationsBle = new FingerprintFileLocations("fingerprints_ble.dat", FINGERPRINTS_TMP_DIR_BLE);
-        fingerprintFileLocationsWifi = new FingerprintFileLocations("fingerprints_wifi.dat", FINGERPRINTS_TMP_DIR_WIFI);
+        fingerprintFileLocationsBle = new FingerprintFileLocations("fingerprints_ble.dat", FINGERPRINTS_TMP_DIR);
 
         // setup export button
         btnExport = findViewById(R.id.btnExport);
@@ -274,7 +273,7 @@ public class MainActivity extends AppCompatActivity {
                     mapView.invalidate();
                 }
 
-                Fingerprint fp = mapView.findNearestFingerprint(mapPosition, 1.0f);
+                FingerprintPosition fp = mapView.findNearestFingerprint(mapPosition, 1.0f);
                 if (fp != null) {
                     selectedFingerprint = fp;
                     fp.selected = true;
@@ -568,14 +567,8 @@ public class MainActivity extends AppCompatActivity {
             // load recording states from ble fingerprints
             File[] files = fingerprintFileLocationsBle.tmpFingerprintsDir.listFiles(fingerprintFileFilter);
             if (files != null) {
-                for (Floor floor : currentMap.getFloors().values()) {
-                    for (Fingerprint f : floor.getFingerprints().values()) {
-                        for (File fpFile : files) {
-                            if (fpFile.getName().equals(f.position.toString() + FINGERPRINTS_EXTENSION)) {
-                                f.recorded = true;
-                            }
-                        }
-                    }
+                for (File fpFile : files) {
+                    // TODO: parse file header here and insert to recordings
                 }
             }
         }
