@@ -113,7 +113,7 @@ public class FingerprintFileParser {
         if(!value.startsWith("[") || !value.endsWith("]")) { return null; }
         value = value.substring(1, value.length() - 1);
         for (Matcher m = arrayAttributePattern.matcher(value); m.find(); ) {
-            result.add(m.group());
+            result.add(m.group(1));
         }
         return result;
     }
