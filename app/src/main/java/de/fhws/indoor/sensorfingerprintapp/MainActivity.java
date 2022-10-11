@@ -54,6 +54,7 @@ import de.fhws.indoor.sensorfingerprintapp.R;
 public class MainActivity extends AppCompatActivity {
     public static final String STREAM_TAG = "FileStream";
     public static final String MAP_URI = "map.xml";
+    public static final String FINGERPRINTS_URI = "fingerprints.dat";
     public static final String FINGERPRINTS_TMP_DIR = "fingerprints";
     public static final String FINGERPRINTS_TMP_EXTENSION = ".dat.tmp";
     public static final String FINGERPRINTS_EXTENSION = ".dat";
@@ -190,6 +191,9 @@ public class MainActivity extends AppCompatActivity {
                     for (File fpFile : files) {
                         try (InputStream in = getContentResolver().openInputStream(Uri.fromFile(fpFile))) {
                             appendToOutputStream(in, out);
+
+                            // write newline at the end of each file
+                            out.write("\n".getBytes(StandardCharsets.UTF_8));
                         } catch (FileNotFoundException e) {
                             Log.e(STREAM_TAG, e.toString());
                             Toast.makeText(getApplicationContext(), "Cannot open input file!", Toast.LENGTH_LONG).show();
@@ -253,7 +257,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         // create output locations
-        fingerprintFileLocations = new FingerprintFileLocations("fingerprints_ble.dat", FINGERPRINTS_TMP_DIR);
+        fingerprintFileLocations = new FingerprintFileLocations(FINGERPRINTS_URI, FINGERPRINTS_TMP_DIR);
 
         // setup export button
         btnExport = findViewById(R.id.btnExport);
