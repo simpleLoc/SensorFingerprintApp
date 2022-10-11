@@ -110,7 +110,7 @@ public class FingerprintFileParser {
     static final Pattern arrayAttributePattern = Pattern.compile("\"([^\"]*)\"");
     private ArrayList<String> parseArrayAttribute(String value) {
         ArrayList<String> result = new ArrayList<>();
-        if(!value.startsWith("[") || value.endsWith("]")) { return null; }
+        if(!value.startsWith("[") || !value.endsWith("]")) { return null; }
         value = value.substring(1, value.length() - 1);
         for (Matcher m = arrayAttributePattern.matcher(value); m.find(); ) {
             result.add(m.group());

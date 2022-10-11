@@ -137,14 +137,14 @@ public class MainActivity extends AppCompatActivity {
                             points.append(String.format(Locale.US, "\"%s\", ", point));
                         }
                         // delete last comma and insert closing bracket
-                        points.delete(points.length()-2, points.length()-1);
+                        points.delete(points.length()-2, points.length());
                         points.append("]");
 
                         out.write(String
                                 .format(Locale.US,
                                         "%s\npoints=%s\n\n",
-                                        FingerprintFileParser.FINGERPRINT_POINT_TAG,
-                                        points.toString())
+                                        FingerprintFileParser.FINGERPRINT_PATH_TAG,
+                                        points)
                                 .getBytes(StandardCharsets.UTF_8));
                     }
 
@@ -597,6 +597,7 @@ public class MainActivity extends AppCompatActivity {
         if (currentMap != null) {
             // TODO: remove insertion of test data
             FingerprintPath testPath = new FingerprintPath();
+            testPath.name = "2.20 -> 2.21";
             testPath.fingerprintNames = new ArrayList<>(Arrays.asList("2.20", "2.21"));
             Objects.requireNonNull(currentMap.getFloors().get("2. Stock")).addFingerprint(testPath);
 
