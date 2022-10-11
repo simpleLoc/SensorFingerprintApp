@@ -90,7 +90,7 @@ public class FingerprintFileParser {
         while(true) {
             String line = nextLine();
             if(line == null || line.equals("")) { return result; } // reached end, return result
-            String[] segments = line.split("=", 1);
+            String[] segments = line.split("=", 2);
             if(segments.length == 2) {
                 result.put(segments[0], segments[1]);
             }
