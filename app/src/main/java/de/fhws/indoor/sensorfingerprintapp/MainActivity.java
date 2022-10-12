@@ -434,6 +434,7 @@ public class MainActivity extends AppCompatActivity {
         super.onStop();
 
         if (recordingFingerprint != null) {
+            Toast.makeText(this, "Stopping recording since app is moved into background!", Toast.LENGTH_LONG).show();
             stopRecording();
         }
 
