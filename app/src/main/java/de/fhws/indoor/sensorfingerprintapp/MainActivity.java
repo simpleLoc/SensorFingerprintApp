@@ -432,6 +432,11 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
+
+        if (recordingFingerprint != null) {
+            stopRecording();
+        }
+
         try {
             sensorManager.stop(this);
         } catch (Exception e) {
