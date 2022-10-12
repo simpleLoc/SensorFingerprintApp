@@ -12,4 +12,8 @@
     <string name="map_path_preview_text">Map path...</string>
     <string name="reset_seen_button_text">Reset Seen State</string>
     <string name="export_button_text">Export</string>
+    <string name="recover_temporary_fingerprint_title">Recover Fingerprint?</string>
+    <string name="recover_temporary_fingerprint_msg">Do you want to recover:</string>
+    <string name="dialog_yes">Yes</string>
+    <string name="dialog_no">No</string>
 </resources>

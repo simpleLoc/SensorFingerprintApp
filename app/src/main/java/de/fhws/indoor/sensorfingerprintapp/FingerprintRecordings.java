@@ -1,7 +1,6 @@
 package de.fhws.indoor.sensorfingerprintapp;
 
 import java.io.File;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Locale;
@@ -45,8 +44,8 @@ public class FingerprintRecordings {
             return id;
         }
 
-        public void setRecordingFile(File file) {
-            id = UUID.fromString(file.getName().replace(MainActivity.FINGERPRINTS_EXTENSION, ""));
+        public void setId(UUID id) {
+            this.id = id;
         }
     }
 
