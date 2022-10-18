@@ -1,2 +1,2 @@
 # SensorFingerprintApp
-App to record fingerprints in Yasmin format
+App to record fingerprints in SensorReadout format
