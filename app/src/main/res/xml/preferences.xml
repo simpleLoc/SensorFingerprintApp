@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <MultiSelectListPreference
+        app:entries="@array/prefActiveSensorsEntries"
+        app:entryValues="@array/prefActiveSensorsValues"
+        app:defaultValue="@array/prefActiveSensorsDefault"
+        app:key="prefActiveSensors"
+        app:summary="@string/prefActiveSensorsSummary"
+        app:title="@string/prefActiveSensors" />
     <EditTextPreference
         app:key="prefWifiScanIntervalMSec"
         app:defaultValue="0"
@@ -12,5 +19,17 @@
         app:key="prefDecawaveUWBTagMacAddress"
         app:singleLine="true"
         app:title="Decawave UWB Tag MAC-Address" />
+    <EditTextPreference
+        app:key="prefFtmRangingIntervalMSec"
+        app:defaultValue="300"
+        app:singleLine="true"
+        app:summary="Interval (ms) with which new FTM ranging requests are scheduled."
+        app:title="FTM Ranging Interval (ms)" />
+    <EditTextPreference
+        app:key="prefFingerprintDurationMSec"
+        app:defaultValue="0"
+        app:singleLine="true"
+        app:summary="@string/prefFingerprintDurationSummary"
+        app:title="@string/prefFingerprintDurationTitle" />
 
 </PreferenceScreen>

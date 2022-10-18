@@ -16,6 +16,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 
 import java.io.File;
@@ -23,6 +24,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.HashSet;
+import java.util.Set;
 
 import de.fhws.indoor.libsmartphoneindoormap.parser.XMLMapParser;
 import de.fhws.indoor.sensorfingerprintapp.R;
@@ -31,6 +34,8 @@ import de.fhws.indoor.sensorfingerprintapp.R;
  * @author Markus Ebner
  */
 public class SettingsFragment extends PreferenceFragmentCompat {
+    private Preference prefActiveSensors = null;
+    private Preference prefDecawaveUWBTagMacAddress = null;
 
     ContentResolver mContentResolver = null;
     ActivityResultLauncher<String> mGetContent = registerForActivityResult(
@@ -51,8 +56,20 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
         setPreferencesFromResource(R.xml.preferences, rootKey);
+
+        prefActiveSensors = findPreference("prefActiveSensors");
+        prefDecawaveUWBTagMacAddress = findPreference("prefDecawaveUWBTagMacAddress");
+        assert prefDecawaveUWBTagMacAddress != null;
+        prefDecawaveUWBTagMacAddress.setEnabled(prefActiveSensors.getPersistedStringSet(new HashSet<>()).contains("DECAWAVE_UWB"));
+
+        prefActiveSensors.setOnPreferenceChangeListener((preference, newValue) -> {
+            Set<String> activeSensors = (Set<String>) newValue;
+            prefDecawaveUWBTagMacAddress.setEnabled(activeSensors.contains("DECAWAVE_UWB"));
+            return true;
+        });
     }
 
+    @NonNull
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         LinearLayout v = (LinearLayout)super.onCreateView(inflater, container, savedInstanceState);

@@ -29,8 +29,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
@@ -66,7 +68,7 @@ public class MainActivity extends AppCompatActivity {
     public static final String FINGERPRINTS_EXTENSION = ".dat";
     public static final String MAP_PREFERENCES = "MAP_PREFERENCES";
     public static final String MAP_PREFERENCES_FLOOR = "FloorName";
-    private static final long DEFAULT_WIFI_SCAN_INTERVAL = (Build.VERSION.SDK_INT == 28 ? 30 : 1);
+    private static final long DEFAULT_WIFI_SCAN_INTERVAL = (Build.VERSION.SDK_INT == 28 ? 30000 : 1);
     public static final String FILE_PROVIDER_AUTHORITY = "de.fhws.indoor.sensorfingerprintapp.fileprovider";
 
     private class FingerprintFileLocations {
@@ -729,14 +731,21 @@ public class MainActivity extends AppCompatActivity {
         }
 
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
+        Set<String> activeSensors = preferences.getStringSet("prefActiveSensors", new HashSet<String>());
 
         SensorManager.Config config = new SensorManager.Config();
-        config.hasWifi = true;
-        config.hasWifiRTT = true;
-        config.hasBluetooth = true;
-        config.hasDecawaveUWB = true;
+        config.hasPhone = activeSensors.contains("PHONE");
+        config.hasGPS = activeSensors.contains("GPS");
+        config.hasWifi = activeSensors.contains("WIFI");
+        config.hasWifiRTT = activeSensors.contains("WIFIRTTSCAN");
+        config.hasBluetooth = activeSensors.contains("BLUETOOTH");
+        config.hasDecawaveUWB = activeSensors.contains("DECAWAVE_UWB");
+        config.hasStepDetector = activeSensors.contains("STEP_DETECTOR");
+        config.hasHeadingChange = activeSensors.contains("HEADING_CHANGE");
+
         config.decawaveUWBTagMacAddress = preferences.getString("prefDecawaveUWBTagMacAddress", "");
-        config.wifiScanIntervalMSec = Long.parseLong(preferences.getString("prefWifiScanIntervalMSec", Long.toString(DEFAULT_WIFI_SCAN_INTERVAL))) * 1000;
+        config.wifiScanIntervalMSec = Long.parseLong(preferences.getString("prefWifiScanIntervalMSec", Long.toString(DEFAULT_WIFI_SCAN_INTERVAL)));
+        config.ftmRangingIntervalMSec = Long.parseLong(preferences.getString("prefFtmRangingIntervalMSec", Long.toString(DEFAULT_WIFI_SCAN_INTERVAL)));
 
         try {
             sensorManager.configure(this, config);

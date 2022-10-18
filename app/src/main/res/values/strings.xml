@@ -16,4 +16,38 @@
     <string name="recover_temporary_fingerprint_msg">Do you want to recover:</string>
     <string name="dialog_yes">Yes</string>
     <string name="dialog_no">No</string>
+
+    <string name="prefActiveSensors">Active Sensors</string>
+    <string name="prefActiveSensorsSummary">Choose the sensors included in the recording</string>
+    <string-array name="prefActiveSensorsEntries">
+        <item>GPS</item>
+        <item>WiFi</item>
+        <item>WiFi RTT Scan</item>
+        <item>Bluetooth</item>
+        <item>Phone (Accel, Gyro, Magnet)</item>
+        <item>Heading Change</item>
+        <item>Step Detector</item>
+        <item>Decawave UWB</item>
+    </string-array>
+    <string-array name="prefActiveSensorsValues">
+        <item>GPS</item>
+        <item>WIFI</item>
+        <item>WIFIRTTSCAN</item>
+        <item>BLUETOOTH</item>
+        <item>PHONE</item>
+        <item>HEADING_CHANGE</item>
+        <item>STEP_DETECTOR</item>
+        <item>DECAWAVE_UWB</item>
+    </string-array>
+    <string-array name="prefActiveSensorsDefault">
+        <item>GPS</item>
+        <item>WIFI</item>
+        <item>BLUETOOTH</item>
+        <item>PHONE</item>
+        <item>HEADING_CHANGE</item>
+        <item>STEP_DETECTOR</item>
+    </string-array>
+
+    <string name="prefFingerprintDurationSummary">Duration of the recording of one fingerprint (ms). 0 for infinitely long recordings.</string>
+    <string name="prefFingerprintDurationTitle">Duration of the recording (ms)</string>
 </resources>
