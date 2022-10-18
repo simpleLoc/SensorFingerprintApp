@@ -68,15 +68,16 @@ public class MainActivity extends AppCompatActivity {
     public static final String FINGERPRINTS_EXTENSION = ".dat";
     public static final String MAP_PREFERENCES = "MAP_PREFERENCES";
     public static final String MAP_PREFERENCES_FLOOR = "FloorName";
-    private static final long DEFAULT_WIFI_SCAN_INTERVAL = (Build.VERSION.SDK_INT == 28 ? 30000 : 1);
     public static final String FILE_PROVIDER_AUTHORITY = "de.fhws.indoor.sensorfingerprintapp.fileprovider";
+    private static final long DEFAULT_WIFI_SCAN_INTERVAL = (Build.VERSION.SDK_INT == 28 ? 30000 : 1);
+    private static final long DEFAULT_FINGERPRINT_DURATION = 0; // infinite
 
     private class FingerprintFileLocations {
         private final File fingerprintsFile;
         private final File tmpFingerprintsDir;
         private File tmpFingerprintsFile = null;
         private BufferedOutputStream tmpFingerprintsOutputStream = null;
-        private TimedOrderedLogger logger;
+        private final TimedOrderedLogger logger;
 
         public FingerprintFileLocations(Context context, String uri, String tmpDir) {
             logger = new TimedOrderedLogger(context, FILE_PROVIDER_AUTHORITY);
@@ -247,6 +248,8 @@ public class MainActivity extends AppCompatActivity {
     private FingerprintFileLocations fingerprintFileLocations;
     private final FingerprintRecordings fingerprintRecordings = new FingerprintRecordings();
     private Fingerprint recordingFingerprint = null;
+    private final Timer timeoutTimer = new Timer(true);
+    private TimerTask timeoutTask = null;
 
     private final FilenameFilter tmpFingerprintFileFilter = (file, s) -> s.endsWith(FINGERPRINTS_TMP_EXTENSION);
     private final FilenameFilter fingerprintFileFilter = (file, s) -> s.endsWith(FINGERPRINTS_EXTENSION);
@@ -258,8 +261,6 @@ public class MainActivity extends AppCompatActivity {
 
         // histogram view with statistics
         // filtered devices enable/disable
-
-        // timeout after x seconds
 
         // create output locations
         fingerprintFileLocations = new FingerprintFileLocations(this, FINGERPRINTS_URI, FINGERPRINTS_TMP_DIR);
@@ -447,6 +448,8 @@ public class MainActivity extends AppCompatActivity {
     private void startRecording() {
         assert fingerprintFileLocations != null;
         assert selectedFingerprint != null;
+        assert timeoutTask == null;
+
         resetSensorStatistics();
 
         try {
@@ -458,6 +461,18 @@ public class MainActivity extends AppCompatActivity {
 
             setBtnExportEnabled();
             setBtnSettingsEnabled();
+
+            // schedule timeoutTask to stop recording after fingerprintDuration
+            long fingerprintDuration = Long.parseLong(PreferenceManager.getDefaultSharedPreferences(this).getString("prefFingerprintDurationMSec", Long.toString(DEFAULT_FINGERPRINT_DURATION)));
+            if (fingerprintDuration != 0) {
+                timeoutTask = new TimerTask() {
+                    @Override
+                    public void run() {
+                        runOnUiThread(() -> stopRecording());
+                    }
+                };
+                timeoutTimer.schedule(timeoutTask, fingerprintDuration);
+            }
         } catch (FileNotFoundException e) {
             Log.e(STREAM_TAG, e.toString());
             Toast.makeText(getApplicationContext(), "Failed opening output stream!", Toast.LENGTH_LONG).show();
@@ -467,6 +482,7 @@ public class MainActivity extends AppCompatActivity {
     private void stopRecording() {
         assert fingerprintFileLocations != null;
         assert recordingFingerprint != null;
+        assert timeoutTask != null;
         try {
             sensorManager.stop(this);
         } catch (Exception e) {
@@ -483,6 +499,10 @@ public class MainActivity extends AppCompatActivity {
             btnStart.setText(R.string.start_button_text);
             setBtnExportEnabled();
             setBtnSettingsEnabled();
+
+            // cancel a maybe still running timeout task, if stop was pressed before timeout
+            timeoutTask.cancel();
+            timeoutTask = null;
         } catch (IOException e) {
             Log.e(STREAM_TAG, e.toString());
             Toast.makeText(getApplicationContext(), "Failed closing output stream!", Toast.LENGTH_LONG).show();
