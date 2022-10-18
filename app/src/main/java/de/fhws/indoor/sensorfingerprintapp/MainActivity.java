@@ -1,6 +1,7 @@
 package de.fhws.indoor.sensorfingerprintapp;
 
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -19,6 +20,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceManager;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
@@ -47,6 +49,8 @@ import de.fhws.indoor.libsmartphoneindoormap.renderer.IMapEventListener;
 import de.fhws.indoor.libsmartphoneindoormap.renderer.MapView;
 import de.fhws.indoor.libsmartphonesensors.SensorManager;
 import de.fhws.indoor.libsmartphonesensors.SensorType;
+import de.fhws.indoor.libsmartphonesensors.loggers.Logger;
+import de.fhws.indoor.libsmartphonesensors.loggers.TimedOrderedLogger;
 import de.fhws.indoor.libsmartphonesensors.sensors.DecawaveUWB;
 import de.fhws.indoor.libsmartphonesensors.sensors.WiFi;
 
@@ -63,14 +67,18 @@ public class MainActivity extends AppCompatActivity {
     public static final String MAP_PREFERENCES = "MAP_PREFERENCES";
     public static final String MAP_PREFERENCES_FLOOR = "FloorName";
     private static final long DEFAULT_WIFI_SCAN_INTERVAL = (Build.VERSION.SDK_INT == 28 ? 30 : 1);
+    public static final String FILE_PROVIDER_AUTHORITY = "de.fhws.indoor.sensorfingerprintapp.fileprovider";
 
     private class FingerprintFileLocations {
         private final File fingerprintsFile;
         private final File tmpFingerprintsDir;
         private File tmpFingerprintsFile = null;
-        private OutputStream tmpFingerprintsOutputStream = null;
+        private BufferedOutputStream tmpFingerprintsOutputStream = null;
+        private TimedOrderedLogger logger;
 
-        public FingerprintFileLocations(String uri, String tmpDir) {
+        public FingerprintFileLocations(Context context, String uri, String tmpDir) {
+            logger = new TimedOrderedLogger(context, FILE_PROVIDER_AUTHORITY);
+
             // file where exported data will be
             fingerprintsFile = new File(getExternalFilesDir(null), uri);
 
@@ -99,14 +107,19 @@ public class MainActivity extends AppCompatActivity {
             }
 
             tmpFingerprintsFile = getFingerprintFile(recording, FINGERPRINTS_TMP_EXTENSION);
-            tmpFingerprintsOutputStream = getContentResolver().openOutputStream(Uri.fromFile(tmpFingerprintsFile), "wt");
+            tmpFingerprintsOutputStream = new BufferedOutputStream(getContentResolver().openOutputStream(Uri.fromFile(tmpFingerprintsFile), "wt"));
             writeHeader(tmpFingerprintsOutputStream, selectedFingerprint);
+            logger.setCustomOutputStream(tmpFingerprintsOutputStream);
+            logger.start(new Logger.FileMetadata("Unknown", "SensorFingerprintApp"));
         }
 
         public void stopRecording(Fingerprint recordingFingerprint) throws IOException {
             assert recordingFingerprint != null;
             assert tmpFingerprintsFile != null;
             assert tmpFingerprintsOutputStream != null;
+
+            // stop logger
+            logger.stop();
 
             // close output stream
             tmpFingerprintsOutputStream.close();
@@ -138,18 +151,9 @@ public class MainActivity extends AppCompatActivity {
             tmpFingerprintsFile = null;
         }
 
-        public void write(long timestamp, String mac, String rssi) {
+        public void write(SensorType id, long timestamp, String csv) {
             if (tmpFingerprintsOutputStream == null) { return; }
-            try {
-                tmpFingerprintsOutputStream.write(
-                        String.format(Locale.US,
-                                "%d %s %s\n",
-                                timestamp,
-                                mac,
-                                rssi).getBytes(StandardCharsets.UTF_8));
-            } catch (IOException e) {
-                Log.e(STREAM_TAG, e.toString());
-            }
+            logger.addCSV(id, timestamp, csv);
         }
 
         public void export() {
@@ -250,8 +254,13 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // histogram view with statistics
+        // filtered devices enable/disable
+
+        // timeout after x seconds
+
         // create output locations
-        fingerprintFileLocations = new FingerprintFileLocations(FINGERPRINTS_URI, FINGERPRINTS_TMP_DIR);
+        fingerprintFileLocations = new FingerprintFileLocations(this, FINGERPRINTS_URI, FINGERPRINTS_TMP_DIR);
 
         // setup export button
         btnExport = findViewById(R.id.btnExport);
@@ -400,19 +409,7 @@ public class MainActivity extends AppCompatActivity {
         // register sensorManager listener for fingerprint recording
         sensorManager.addSensorListener((timestamp, id, csv) -> {
             if (recordingFingerprint == null) { return; }
-            String[] splitCSV = csv.split(";");
-            switch (id) {
-                case IBEACON:
-                    fingerprintFileLocations.write(timestamp, toMACWithDots(splitCSV[0]), splitCSV[1]);
-                    break;
-
-                case WIFI:
-                    fingerprintFileLocations.write(timestamp, toMACWithDots(splitCSV[0]), splitCSV[2]);
-                    break;
-
-                default:
-                    break;
-            }
+            fingerprintFileLocations.write(id, timestamp, csv);
         });
     }
 
@@ -448,6 +445,8 @@ public class MainActivity extends AppCompatActivity {
     private void startRecording() {
         assert fingerprintFileLocations != null;
         assert selectedFingerprint != null;
+        resetSensorStatistics();
+
         try {
             fingerprintFileLocations.startRecording(selectedFingerprint);
 
@@ -479,7 +478,6 @@ public class MainActivity extends AppCompatActivity {
 
             recordingFingerprint = null;
 
-            resetSensorStatistics();
             btnStart.setText(R.string.start_button_text);
             setBtnExportEnabled();
             setBtnSettingsEnabled();
