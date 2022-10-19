@@ -13,12 +13,21 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceManager;
+
+import com.github.mikephil.charting.charts.BarChart;
+import com.github.mikephil.charting.components.AxisBase;
+import com.github.mikephil.charting.components.XAxis;
+import com.github.mikephil.charting.data.BarData;
+import com.github.mikephil.charting.data.BarDataSet;
+import com.github.mikephil.charting.data.BarEntry;
+import com.github.mikephil.charting.formatter.ValueFormatter;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -29,6 +38,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Objects;
@@ -244,12 +254,18 @@ public class MainActivity extends AppCompatActivity {
     private Button btnStart = null;
     private Button btnExport = null;
     private Button btnSettings = null;
+    private Button btnStatistics = null;
+
+    private LinearLayout layoutStatistics = null;
+    private BarChart barChartStatistics = null;
+    private HashMap<SensorType, HashMap<String, AtomicLong>> statisticsData = new HashMap<>();
 
     private FingerprintFileLocations fingerprintFileLocations;
     private final FingerprintRecordings fingerprintRecordings = new FingerprintRecordings();
     private Fingerprint recordingFingerprint = null;
-    private final Timer timeoutTimer = new Timer(true);
     private TimerTask timeoutTask = null;
+
+    private final Timer timer = new Timer(true);
 
     private final FilenameFilter tmpFingerprintFileFilter = (file, s) -> s.endsWith(FINGERPRINTS_TMP_EXTENSION);
     private final FilenameFilter fingerprintFileFilter = (file, s) -> s.endsWith(FINGERPRINTS_EXTENSION);
@@ -259,7 +275,6 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // histogram view with statistics
         // filtered devices enable/disable
 
         // create output locations
@@ -298,17 +313,6 @@ public class MainActivity extends AppCompatActivity {
         lblCntWifi.setOnClickListener(wifiClickListener);
         lblCntWifiRTT.setOnClickListener(wifiClickListener);
 
-        // setup start fingerprinting button
-        btnStart = findViewById(R.id.btnStart);
-        btnStart.setEnabled(false);
-        btnStart.setOnClickListener((view) -> {
-            if (recordingFingerprint == null) {
-                startRecording();
-            } else {
-                stopRecording();
-            }
-        });
-
         mapView.addEventListener(new IMapEventListener() {
             @Override
             public void onTap(Vec2 mapPosition) {
@@ -343,12 +347,30 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        // setup statistic layout
+        layoutStatistics = findViewById(R.id.LayoutStatistics);
+        layoutStatistics.setVisibility(View.GONE);
+
+        barChartStatistics = findViewById(R.id.BarChartStatistics);
+
+        // setup start fingerprinting button
+        btnStart = findViewById(R.id.btnStart);
+        btnStart.setEnabled(false);
+        btnStart.setOnClickListener((view) -> {
+            if (recordingFingerprint == null) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        });
+
         // setup settings view
         btnSettings = findViewById(R.id.btnSettings);
         btnSettings.setOnClickListener(v -> startActivity(new Intent(getApplicationContext(), SettingsActivity.class)));
 
         mFloorNameAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, new ArrayList<>());
 
+        // setup floor spinner
         Spinner spinnerFloor = findViewById(R.id.spinner_selectFloor);
         spinnerFloor.setAdapter(mFloorNameAdapter);
         spinnerFloor.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -366,6 +388,47 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onNothingSelected(AdapterView<?> adapterView) {}
         });
+
+        // setup statistics view
+        btnStatistics = findViewById(R.id.btnStatistics);
+        btnStatistics.setOnClickListener(view -> {
+            layoutStatistics.setVisibility(layoutStatistics.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+        });
+        barChartStatistics = findViewById(R.id.BarChartStatistics);
+        barChartStatistics.getXAxis().setTextColor(getResources().getColor(R.color.text_black, getTheme()));
+        barChartStatistics.getXAxis().setPosition(XAxis.XAxisPosition.BOTTOM);
+        barChartStatistics.getXAxis().setLabelRotationAngle(90);
+
+        timer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                if (layoutStatistics.getVisibility() == View.VISIBLE) {
+                    HashMap<String, AtomicLong> sensorData = statisticsData.get(SensorType.IBEACON);
+                    if (sensorData != null) {
+                        ArrayList<BarEntry> entries = new ArrayList<>();
+                        ArrayList<String> ids = new ArrayList<>();
+                        for (java.util.Map.Entry<String, AtomicLong> entry : sensorData.entrySet()) {
+                            entries.add(new BarEntry(ids.size(), entry.getValue().get()));
+                            ids.add(entry.getKey());
+                        }
+                        BarDataSet set = new BarDataSet(entries, SensorType.IBEACON.toString());
+                        BarData data = new BarData(set);
+                        ValueFormatter formatter = new ValueFormatter() {
+                            @Override
+                            public String getAxisLabel(float value, AxisBase axis) {
+                                return ids.get(Math.min(Math.max(0, Math.round(value)), ids.size()-1));
+                            }
+                        };
+                        runOnUiThread(() -> {
+                            barChartStatistics.getXAxis().setValueFormatter(formatter);
+                            barChartStatistics.setData(data);
+                            barChartStatistics.setFitBars(true);
+                            barChartStatistics.invalidate();
+                        });
+                    }
+                }
+            }
+        }, 1000, 1000);
 
         // setup sensorManager callbacks
         sensorManager.addSensorListener((timestamp, sensorId, csv) -> {
@@ -394,11 +457,42 @@ public class MainActivity extends AppCompatActivity {
         //register sensorManager listener for statistics UI
         sensorManager.addSensorListener((timestamp, id, csv) -> {
             // update UI for WIFI/BEACON/GPS
-            if(id == SensorType.WIFI) { loadCounterWifi.incrementAndGet(); }
-            if(id == SensorType.WIFIRTT) { loadCounterWifiRTT.incrementAndGet(); }
-            if(id == SensorType.IBEACON) { loadCounterBeacon.incrementAndGet(); }
-            if(id == SensorType.GPS) { loadCounterGPS.incrementAndGet(); }
-            if(id == SensorType.DECAWAVE_UWB) { loadCounterUWB.incrementAndGet(); }
+            switch (id) {
+                case WIFI: {
+                    loadCounterWifi.incrementAndGet();
+                    break;
+                }
+                case WIFIRTT: {
+                    loadCounterWifiRTT.incrementAndGet();
+                    break;
+                }
+                case IBEACON: {
+                    loadCounterBeacon.incrementAndGet();
+                    break;
+                }
+                case GPS: {
+                    loadCounterGPS.incrementAndGet();
+                    break;
+                }
+                case DECAWAVE_UWB: {
+                    loadCounterUWB.incrementAndGet();
+                    break;
+                }
+            }
+
+            String[] splitString = csv.split(";");
+            if (!statisticsData.containsKey(id)) {
+                statisticsData.put(id, new HashMap<>());
+            }
+
+            HashMap<String, AtomicLong> sensorStatistics = statisticsData.get(id);
+            assert sensorStatistics != null;
+            if (!sensorStatistics.containsKey(splitString[0])) {
+                sensorStatistics.put(splitString[0], new AtomicLong(0));
+            }
+            AtomicLong sensorCnt = sensorStatistics.get(splitString[0]);
+            assert sensorCnt != null;
+            sensorCnt.incrementAndGet();
         });
 
         sensorManagerStatisticsTimer = new Timer();
@@ -471,7 +565,7 @@ public class MainActivity extends AppCompatActivity {
                         runOnUiThread(() -> stopRecording());
                     }
                 };
-                timeoutTimer.schedule(timeoutTask, fingerprintDuration);
+                timer.schedule(timeoutTask, fingerprintDuration);
             }
         } catch (FileNotFoundException e) {
             Log.e(STREAM_TAG, e.toString());

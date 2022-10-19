@@ -4,4 +4,5 @@
     <color name="unseenColor">#CCFF0000</color>
     <color name="seenColor">#FF00FF00</color>
     <color name="selectedColor">#FFEB3B</color>
+    <color name="text_black">#FFFFFFFF</color>
 </resources>

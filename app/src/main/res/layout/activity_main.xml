@@ -21,11 +21,33 @@
             android:layout_width="match_parent"
             android:layout_height="48dp" />
 
-        <de.fhws.indoor.libsmartphoneindoormap.renderer.MapView
-            android:id="@+id/MapView"
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/LayoutStatistics"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:visibility="visible">
+
+                <com.github.mikephil.charting.charts.BarChart
+                    android:id="@+id/BarChartStatistics"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+            </LinearLayout>
+
+            <de.fhws.indoor.libsmartphoneindoormap.renderer.MapView
+                android:id="@+id/MapView"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+        </LinearLayout>
 
         <GridLayout
             android:layout_width="wrap_content"
@@ -152,6 +174,12 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/start_button_text" />
+
+        <Button
+            android:id="@+id/btnStatistics"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/statistics_button_text" />
 
         <Button
             android:id="@+id/btnSettings"
