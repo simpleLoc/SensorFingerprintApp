@@ -1,5 +1,7 @@
 package de.fhws.indoor.sensorfingerprintapp;
 
+import androidx.annotation.Nullable;
+
 import com.github.mikephil.charting.components.AxisBase;
 import com.github.mikephil.charting.data.BarData;
 import com.github.mikephil.charting.data.BarDataSet;
@@ -10,6 +12,7 @@ import java.text.DecimalFormat;
 import java.text.Format;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Set;
 
 import de.fhws.indoor.libsmartphonesensors.SensorType;
 
@@ -82,12 +85,14 @@ public class StatisticsData {
             return sensorData;
         }
 
-        public FormattedBarData getBarData() {
+        public FormattedBarData getBarData(@Nullable Set<String> filter) {
             ArrayList<BarEntry> entries = new ArrayList<>();
             ArrayList<String> ids = new ArrayList<>();
             for (java.util.Map.Entry<String, SensorData> entry : sensorData.entrySet()) {
-                entries.add(new BarEntry(ids.size(), entry.getValue().getSum()));
-                ids.add(entry.getKey());
+                if (filter == null || filter.contains(entry.getKey())) {
+                    entries.add(new BarEntry(ids.size(), entry.getValue().getSum()));
+                    ids.add(entry.getKey());
+                }
             }
             BarDataSet set = new BarDataSet(entries, sensorType.toString());
             BarData data = new BarData(set);

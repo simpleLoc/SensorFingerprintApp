@@ -13,6 +13,7 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -54,6 +55,7 @@ import java.util.TimerTask;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
+import de.fhws.indoor.libsmartphoneindoormap.model.Beacon;
 import de.fhws.indoor.libsmartphoneindoormap.model.Fingerprint;
 import de.fhws.indoor.libsmartphoneindoormap.model.FingerprintPath;
 import de.fhws.indoor.libsmartphoneindoormap.model.FingerprintPosition;
@@ -264,6 +266,7 @@ public class MainActivity extends AppCompatActivity {
 
     private LinearLayout layoutStatistics = null;
     private BarChart barChartStatistics = null;
+    private FormattedBarData barChartData = null;
     private SensorType barChartSensorType = SensorType.IBEACON;
     private String barChartSensorId = null;
     private final StatisticsData statisticsData = new StatisticsData();
@@ -455,7 +458,7 @@ public class MainActivity extends AppCompatActivity {
             public void onValueSelected(Entry e, Highlight h) {
                 if (barChartSensorId == null) {
                     AxisBase xAxis = barChartStatistics.getXAxis();
-                    barChartSensorId = xAxis.getValueFormatter().getAxisLabel(e.getX(), xAxis);
+                    barChartSensorId = barChartData.formatter.getAxisLabel(e.getX(), xAxis);
                     backPressedCallback.setEnabled(true);
                 }
             }
@@ -464,22 +467,74 @@ public class MainActivity extends AppCompatActivity {
             public void onNothingSelected() {}
         });
 
+        CheckBox barChartFilterByMap = findViewById(R.id.checkBox_filterByMap);
+
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
                 if (layoutStatistics.getVisibility() == View.VISIBLE) {
                     StatisticsData.SensorTypeData sensorTypeData = statisticsData.getSensorTypeData(barChartSensorType);
                     if (sensorTypeData != null) {
-                        FormattedBarData formattedBarData;
+                        // generate translation map if possible
+                        final HashMap<String, String> mac2Name;
+                        if (currentMap != null) {
+                            mac2Name = new HashMap<>();
+                            switch (barChartSensorType) {
+                                case IBEACON:
+                                    currentMap.getBeacons().forEach((mac, beacon) -> {
+                                        mac2Name.put(mac.toString(), beacon.name);
+                                    });
+                                    break;
+
+                                case WIFI:
+                                case WIFIRTT:
+                                    currentMap.getAccessPoints().forEach((mac, ap) -> mac2Name.put(mac.toString(), ap.name));
+                                    break;
+
+                                default:
+                                    break;
+                            }
+                        } else {
+                            mac2Name = null;
+                        }
+
+                        // create an additional ValueFormatter to translate String identifier to something human readable if required
+                        ValueFormatter translationFormatter = null;
                         if (barChartSensorId != null) {
                              StatisticsData.SensorTypeData.SensorData sensorData = sensorTypeData.getSensorData(barChartSensorId);
-                             formattedBarData = sensorData.getBarData();
+                            barChartData = sensorData.getBarData();
+
+                            // translate mac
+                            if (mac2Name != null) {
+                                barChartData.barData.getDataSetByIndex(0).setLabel(mac2Name.get(barChartSensorId));
+                            }
                         } else {
-                            formattedBarData = sensorTypeData.getBarData();
+                            if (mac2Name != null) {
+                                // get data
+                                if (barChartFilterByMap.isChecked()) {
+                                    barChartData = sensorTypeData.getBarData(mac2Name.keySet());
+                                } else {
+                                    barChartData = sensorTypeData.getBarData(null);
+                                }
+
+                                // translate data
+                                translationFormatter = new ValueFormatter() {
+                                    @Override
+                                    public String getAxisLabel(float value, AxisBase axis) {
+                                        String sensorId = barChartData.formatter.getAxisLabel(value, axis);
+                                        return mac2Name.getOrDefault(sensorId, sensorId);
+                                    }
+                                };
+                            } else {
+                                barChartData = sensorTypeData.getBarData(null);
+                            }
                         }
+
+                        // if it can be translated, translate!
+                        ValueFormatter formatter = translationFormatter != null ? translationFormatter : barChartData.formatter;
                         runOnUiThread(() -> {
-                            barChartStatistics.getXAxis().setValueFormatter(formattedBarData.formatter);
-                            barChartStatistics.setData(formattedBarData.barData);
+                            barChartStatistics.getXAxis().setValueFormatter(formatter);
+                            barChartStatistics.setData(barChartData.barData);
                             barChartStatistics.setFitBars(true);
                             barChartStatistics.invalidate();
                         });

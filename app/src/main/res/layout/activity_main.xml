@@ -30,6 +30,12 @@
                 android:orientation="vertical"
                 android:visibility="visible">
 
+                <CheckBox
+                    android:id="@+id/checkBox_filterByMap"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/filter_by_map" />
+
                 <Spinner
                     android:id="@+id/spinner_sensorType"
                     android:layout_width="match_parent"
@@ -38,7 +44,10 @@
                 <com.github.mikephil.charting.charts.BarChart
                     android:id="@+id/BarChartStatistics"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent" />
+                    android:layout_height="match_parent">
+
+                </com.github.mikephil.charting.charts.BarChart>
+
             </LinearLayout>
 
             <LinearLayout
