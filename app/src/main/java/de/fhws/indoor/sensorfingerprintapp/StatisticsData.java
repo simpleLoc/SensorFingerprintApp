@@ -99,6 +99,9 @@ public class StatisticsData {
             ValueFormatter formatter = new ValueFormatter() {
                 @Override
                 public String getAxisLabel(float value, AxisBase axis) {
+                    if (ids.isEmpty()) {
+                        return "No Formatter";
+                    }
                     return ids.get(Math.min(Math.max(0, Math.round(value)), ids.size()-1));
                 }
             };

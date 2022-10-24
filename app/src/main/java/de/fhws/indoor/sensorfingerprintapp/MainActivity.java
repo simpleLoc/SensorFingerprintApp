@@ -45,6 +45,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.Format;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
@@ -53,6 +54,9 @@ import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import de.fhws.indoor.libsmartphoneindoormap.model.Beacon;
@@ -270,6 +274,7 @@ public class MainActivity extends AppCompatActivity {
     private SensorType barChartSensorType = SensorType.IBEACON;
     private String barChartSensorId = null;
     private final StatisticsData statisticsData = new StatisticsData();
+    private final AtomicBoolean statisticsVisible = new AtomicBoolean(false);
 
     private FingerprintFileLocations fingerprintFileLocations;
     private final FingerprintRecordings fingerprintRecordings = new FingerprintRecordings();
@@ -444,7 +449,13 @@ public class MainActivity extends AppCompatActivity {
         // setup bar chart
         btnStatistics = findViewById(R.id.btnStatistics);
         btnStatistics.setOnClickListener(view -> {
-            layoutStatistics.setVisibility(layoutStatistics.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+            if (layoutStatistics.getVisibility() == View.VISIBLE) {
+                layoutStatistics.setVisibility(View.GONE);
+                statisticsVisible.set(false);
+            } else {
+                layoutStatistics.setVisibility(View.VISIBLE);
+                statisticsVisible.set(true);
+            }
         });
         barChartStatistics = findViewById(R.id.BarChartStatistics);
         barChartStatistics.getLegend().setTextColor(getResources().getColor(R.color.text_black, getTheme()));
@@ -472,7 +483,7 @@ public class MainActivity extends AppCompatActivity {
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                if (layoutStatistics.getVisibility() == View.VISIBLE) {
+                if (statisticsVisible.get()) {
                     StatisticsData.SensorTypeData sensorTypeData = statisticsData.getSensorTypeData(barChartSensorType);
                     if (sensorTypeData != null) {
                         // generate translation map if possible
@@ -552,7 +563,7 @@ public class MainActivity extends AppCompatActivity {
             } else if(sensorId == SensorType.WIFI) {
                 currentMap.setSeenWiFi(csv.substring(0, 12));
             } else if(sensorId == SensorType.WIFIRTT) {
-                currentMap.setSeenFtm(csv.substring(0, 12));
+                currentMap.setSeenFtm(csv.substring(2, 14));
             } else if(sensorId == SensorType.DECAWAVE_UWB) {
                 String[] segments = csv.split(";");
                 // skip initial 4 (x, y, z, quality) - then take every 3rd
@@ -580,7 +591,7 @@ public class MainActivity extends AppCompatActivity {
                 case WIFIRTT: {
                     loadCounterWifiRTT.incrementAndGet();
                     // ftm dist
-                    statisticsData.put(id, splitString[1], Float.parseFloat(splitString[2]));
+                    statisticsData.put(id, splitString[1], Float.parseFloat(splitString[2]) / 1000);
                     // ftm RSSI
                     statisticsData.put(SensorType.WIFI, splitString[1], Float.parseFloat(splitString[4]));
                     break;
@@ -785,7 +796,7 @@ public class MainActivity extends AppCompatActivity {
                     // parse header and contents
                     FingerprintFileParser fingerprintFileParser = new FingerprintFileParser(
                             in,
-                            FingerprintFileParser.WhatToParse.HEADER_AND_DATA);
+                            FingerprintFileParser.WhatToParse.ONLY_HEADER);
                     ArrayList<FingerprintRecordings.Recording> recordingsInFile = fingerprintFileParser.parse();
 
                     //close input stream
@@ -796,12 +807,14 @@ public class MainActivity extends AppCompatActivity {
                         // file is good
                         FingerprintRecordings.Recording r = recordingsInFile.get(0);
                         r.setId(UUID.fromString(fpFile.getName().replace(MainActivity.FINGERPRINTS_TMP_EXTENSION, "")));
+
                         // ask if it should be recovered
                         AlertDialog.Builder builder = new AlertDialog.Builder(this);
                         builder
                                 .setTitle(R.string.recover_temporary_fingerprint_title)
                                 .setMessage(String.format(Locale.getDefault(),
-                                        "%s %s?", getString(R.string.recover_temporary_fingerprint_msg), r.fingerprintName))
+                                        "%s %s?\nRecorded at: %s", getString(R.string.recover_temporary_fingerprint_msg), r.fingerprintName,
+                                        new Date(fpFile.lastModified())))
                                 .setNegativeButton(R.string.dialog_no, null)
                                 .setPositiveButton(R.string.dialog_yes, (DialogInterface dialog, int id) -> recoverTmpFingerprint(r, fpFile));
 
