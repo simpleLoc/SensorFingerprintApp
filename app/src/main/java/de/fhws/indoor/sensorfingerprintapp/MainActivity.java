@@ -73,6 +73,8 @@ import de.fhws.indoor.libsmartphoneindoormap.renderer.IMapEventListener;
 import de.fhws.indoor.libsmartphoneindoormap.renderer.MapView;
 import de.fhws.indoor.libsmartphonesensors.SensorManager;
 import de.fhws.indoor.libsmartphonesensors.SensorType;
+import de.fhws.indoor.libsmartphonesensors.io.RecordingManager;
+import de.fhws.indoor.libsmartphonesensors.io.RecordingSession;
 import de.fhws.indoor.libsmartphonesensors.loggers.Logger;
 import de.fhws.indoor.libsmartphonesensors.loggers.TimedOrderedLogger;
 import de.fhws.indoor.libsmartphonesensors.sensors.DecawaveUWB;
@@ -86,7 +88,7 @@ public class MainActivity extends AppCompatActivity {
     public static final String MAP_URI = "map.xml";
     public static final String FINGERPRINTS_URI = "fingerprints.dat";
     public static final String FINGERPRINTS_TMP_DIR = "fingerprints";
-    public static final String FINGERPRINTS_TMP_EXTENSION = ".dat.tmp";
+    public static final String FINGERPRINTS_TMP_EXTENSION = ".tmp";
     public static final String FINGERPRINTS_EXTENSION = ".dat";
     public static final String MAP_PREFERENCES = "MAP_PREFERENCES";
     public static final String MAP_PREFERENCES_FLOOR = "FloorName";
@@ -94,16 +96,15 @@ public class MainActivity extends AppCompatActivity {
     private static final long DEFAULT_WIFI_SCAN_INTERVAL = (Build.VERSION.SDK_INT == 28 ? 30000 : 1);
     private static final long DEFAULT_FINGERPRINT_DURATION = 0; // infinite
 
+    private RecordingManager recordingManager;
+
     private class FingerprintFileLocations {
         private final File fingerprintsFile;
         private final File tmpFingerprintsDir;
-        private File tmpFingerprintsFile = null;
-        private BufferedOutputStream tmpFingerprintsOutputStream = null;
-        private final TimedOrderedLogger logger;
+
+        private final Logger logger = new TimedOrderedLogger(getApplicationContext());
 
         public FingerprintFileLocations(Context context, String uri, String tmpDir) {
-            logger = new TimedOrderedLogger(context, FILE_PROVIDER_AUTHORITY);
-
             // file where exported data will be
             fingerprintsFile = new File(getExternalFilesDir(null), uri);
 
@@ -121,8 +122,6 @@ public class MainActivity extends AppCompatActivity {
         public void startRecording(Fingerprint selectedFingerprint) throws FileNotFoundException {
             assert recordingFingerprint == null;
             assert tmpFingerprintsDir != null;
-            assert tmpFingerprintsFile == null;
-            assert tmpFingerprintsOutputStream == null;
 
             // check if that fingerprint was already recorded
             FingerprintRecordings.Recording recording = fingerprintRecordings.getRecording(selectedFingerprint);
@@ -131,24 +130,18 @@ public class MainActivity extends AppCompatActivity {
                 fingerprintRecordings.addRecording(recording);
             }
 
-            tmpFingerprintsFile = getFingerprintFile(recording, FINGERPRINTS_TMP_EXTENSION);
-            tmpFingerprintsOutputStream = new BufferedOutputStream(getContentResolver().openOutputStream(Uri.fromFile(tmpFingerprintsFile), "wt"));
-            writeHeader(tmpFingerprintsOutputStream, selectedFingerprint);
-            logger.setCustomOutputStream(tmpFingerprintsOutputStream);
-            logger.start(new Logger.FileMetadata("Unknown", "SensorFingerprintApp"));
+            recordingManager.startNewNamedSession(recording.getId().toString() + FINGERPRINTS_TMP_EXTENSION);
+            writeHeader(recordingManager.getCurrentSession().stream(), selectedFingerprint);
+            logger.start(recordingManager.getCurrentSession(), new Logger.FileMetadata("Unknown", "SensorFingerprintApp"));
         }
 
         public void stopRecording(Fingerprint recordingFingerprint) throws IOException {
             assert recordingFingerprint != null;
-            assert tmpFingerprintsFile != null;
-            assert tmpFingerprintsOutputStream != null;
 
             // stop logger
             logger.stop();
-
-            // close output stream
-            tmpFingerprintsOutputStream.close();
-            tmpFingerprintsOutputStream = null;
+            RecordingSession prevSession = recordingManager.getCurrentSession();
+            prevSession.close();
 
             // get recording from database
             FingerprintRecordings.Recording recording = fingerprintRecordings.getRecording(recordingFingerprint);
@@ -156,28 +149,13 @@ public class MainActivity extends AppCompatActivity {
 
             // open output stream as input stream
             File outFile = getFingerprintFile(recording, FINGERPRINTS_EXTENSION);
-            try (InputStream in = getContentResolver().openInputStream(Uri.fromFile(tmpFingerprintsFile))) {
-                try (OutputStream out = getContentResolver().openOutputStream(Uri.fromFile(outFile), "wt")) {
-                    // append content
-                    appendToOutputStream(in, out);
-                } catch (FileNotFoundException e) {
-                    Log.e(STREAM_TAG, e.toString());
-                    Toast.makeText(getApplicationContext(), "Cannot open output file!", Toast.LENGTH_LONG).show();
-                }
-            } catch (FileNotFoundException e) {
-                Log.e(STREAM_TAG, e.toString());
-                Toast.makeText(getApplicationContext(), "Cannot open temporary input file!", Toast.LENGTH_LONG).show();
+            if(!prevSession.getFile().renameTo(outFile)) {
+                Toast.makeText(getApplicationContext(), "Could not rename to finalized fingerprint file", Toast.LENGTH_LONG)
+                        .show();
             }
-
-            if (!tmpFingerprintsFile.delete()) {
-                Toast.makeText(getApplicationContext(), "Cannot delete temporary fingerprint file!", Toast.LENGTH_LONG).show();
-            }
-
-            tmpFingerprintsFile = null;
         }
 
         public void write(SensorType id, long timestamp, String csv) {
-            if (tmpFingerprintsOutputStream == null) { return; }
             logger.addCSV(id, timestamp, csv);
         }
 
@@ -291,6 +269,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        recordingManager = new RecordingManager(new File(getExternalFilesDir(null), FINGERPRINTS_TMP_DIR), FILE_PROVIDER_AUTHORITY);
+        
         // filtered devices enable/disable
 
         // create output locations
@@ -690,6 +670,7 @@ public class MainActivity extends AppCompatActivity {
             }
         } catch (FileNotFoundException e) {
             Log.e(STREAM_TAG, e.toString());
+            e.printStackTrace();
             Toast.makeText(getApplicationContext(), "Failed opening output stream!", Toast.LENGTH_LONG).show();
         }
     }
