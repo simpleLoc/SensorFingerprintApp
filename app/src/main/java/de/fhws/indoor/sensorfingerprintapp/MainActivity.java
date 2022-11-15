@@ -79,6 +79,7 @@ import de.fhws.indoor.libsmartphonesensors.loggers.Logger;
 import de.fhws.indoor.libsmartphonesensors.loggers.TimedOrderedLogger;
 import de.fhws.indoor.libsmartphonesensors.sensors.DecawaveUWB;
 import de.fhws.indoor.libsmartphonesensors.sensors.WiFi;
+import de.fhws.indoor.libsmartphonesensors.util.MultiPermissionRequester;
 
 /**
  * @author Steffen Kastner
@@ -97,6 +98,7 @@ public class MainActivity extends AppCompatActivity {
     private static final long DEFAULT_FINGERPRINT_DURATION = 0; // infinite
 
     private RecordingManager recordingManager;
+    private MultiPermissionRequester permissionRequester = new MultiPermissionRequester(this);
 
     private class FingerprintFileLocations {
         private final File fingerprintsFile;
@@ -615,6 +617,7 @@ public class MainActivity extends AppCompatActivity {
         recordingFingerprint = null;
         setBtnStartEnabled();
         setBtnExportEnabled();
+        setupSensors();
 
         // try to recover temporary fingerprint files that were aborted during recording
         recoverTmpFingerprints();
@@ -650,7 +653,7 @@ public class MainActivity extends AppCompatActivity {
         try {
             fingerprintFileLocations.startRecording(selectedFingerprint);
 
-            setupSensors();
+            sensorManager.start(this);
             btnStart.setText(R.string.stop_button_text);
             recordingFingerprint = selectedFingerprint;
 
@@ -672,6 +675,9 @@ public class MainActivity extends AppCompatActivity {
             Log.e(STREAM_TAG, e.toString());
             e.printStackTrace();
             Toast.makeText(getApplicationContext(), "Failed opening output stream!", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Toast.makeText(getApplicationContext(), "Failed to start recording", Toast.LENGTH_LONG).show();
+            e.printStackTrace();
         }
     }
 
@@ -970,8 +976,8 @@ public class MainActivity extends AppCompatActivity {
         config.ftmRangingIntervalMSec = Long.parseLong(preferences.getString("prefFtmRangingIntervalMSec", Long.toString(DEFAULT_WIFI_SCAN_INTERVAL)));
 
         try {
-            sensorManager.configure(this, config);
-            sensorManager.start(this);
+            sensorManager.configure(this, config, permissionRequester);
+            permissionRequester.launch();
         } catch (Exception e) {
             e.printStackTrace();
             //TODO: ui feedback?
