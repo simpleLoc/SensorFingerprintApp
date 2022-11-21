@@ -31,5 +31,11 @@
         app:singleLine="true"
         app:summary="@string/prefFingerprintDurationSummary"
         app:title="@string/prefFingerprintDurationTitle" />
+    <EditTextPreference
+        app:key="prefFtmBurstSize"
+        app:defaultValue="0"
+        app:singleLine="true"
+        app:summary="@string/prefFtmBurstSizeSummary"
+        app:title="@string/prefFtmBurstSizeTitle" />
 
 </PreferenceScreen>

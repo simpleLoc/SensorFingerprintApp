@@ -52,5 +52,7 @@
 
     <string name="prefFingerprintDurationSummary">Duration of the recording of one fingerprint (ms). 0 for infinitely long recordings.</string>
     <string name="prefFingerprintDurationTitle">Duration of the recording (ms)</string>
+    <string name="prefFtmBurstSizeSummary">Number of measurement packets per burst. 0 for default of device.</string>
+    <string name="prefFtmBurstSizeTitle">FTM burst size</string>
 
 </resources>

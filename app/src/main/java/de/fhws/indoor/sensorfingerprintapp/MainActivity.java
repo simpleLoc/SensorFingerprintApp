@@ -6,6 +6,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
+import android.net.wifi.rtt.RangingRequest;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -974,6 +975,10 @@ public class MainActivity extends AppCompatActivity {
         config.decawaveUWBTagMacAddress = preferences.getString("prefDecawaveUWBTagMacAddress", "");
         config.wifiScanIntervalMSec = Long.parseLong(preferences.getString("prefWifiScanIntervalMSec", Long.toString(DEFAULT_WIFI_SCAN_INTERVAL)));
         config.ftmRangingIntervalMSec = Long.parseLong(preferences.getString("prefFtmRangingIntervalMSec", Long.toString(DEFAULT_WIFI_SCAN_INTERVAL)));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            int burstSize = Integer.parseInt(preferences.getString("prefFtmBurstSize", Integer.toString(RangingRequest.getDefaultRttBurstSize())));
+            config.ftmBurstSize = (burstSize != 0) ? burstSize : RangingRequest.getDefaultRttBurstSize();
+        }
 
         try {
             sensorManager.configure(this, config, permissionRequester);
