@@ -11,8 +11,6 @@ import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import de.fhws.indoor.libsmartphoneindoormap.model.FingerprintPosition;
-
 public class FingerprintFileParser {
     public static final String FINGERPRINT_POINT_TAG = "[fingerprint:point]";
     public static final String FINGERPRINT_PATH_TAG = "[fingerprint:path]";

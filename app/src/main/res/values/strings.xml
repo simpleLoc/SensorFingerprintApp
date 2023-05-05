@@ -18,6 +18,7 @@
     <string name="recover_temporary_fingerprint_msg">Do you want to recover:</string>
     <string name="dialog_yes">Yes</string>
     <string name="dialog_no">No</string>
+    <string name="event_count_txt">%1$d evts</string>
 
     <string name="prefActiveSensors">Active Sensors</string>
     <string name="prefActiveSensorsSummary">Choose the sensors included in the recording</string>

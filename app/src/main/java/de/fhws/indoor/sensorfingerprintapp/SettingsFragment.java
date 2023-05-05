@@ -127,7 +127,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         // delete fingerprint files that were recorded with the previous map
         deleteTmpFingerprintFiles();
 
-        Uri dst = Uri.fromFile(new File(getActivity().getExternalFilesDir(null), MainActivity.MAP_URI));
+        Uri dst = Uri.fromFile(new File(getActivity().getFilesDir(), MainActivity.MAP_URI));
         try {
             copyMapToAppStorage(uri, dst);
         } catch (IOException e) {
@@ -137,6 +137,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
         try {
             XMLMapParser parser = new XMLMapParser(getContext());
             MainActivity.currentMap = parser.parse(mContentResolver.openInputStream(dst));
+            MainActivity.currentMap.resetSeen(true);
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
@@ -147,7 +148,7 @@ public class SettingsFragment extends PreferenceFragmentCompat {
     }
 
     private void deleteTmpFingerprintFiles(String tmpFileDir) {
-        File[] files = new File(requireActivity().getExternalFilesDir(null), tmpFileDir).listFiles();
+        File[] files = new File(requireActivity().getFilesDir(), tmpFileDir).listFiles();
         if (files != null) {
             for (File fpFile : files) {
                 if (!fpFile.delete()) {

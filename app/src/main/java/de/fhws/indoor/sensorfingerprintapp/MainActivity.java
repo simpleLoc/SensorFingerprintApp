@@ -9,6 +9,7 @@ import android.net.Uri;
 import android.net.wifi.rtt.RangingRequest;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
@@ -27,15 +28,11 @@ import androidx.preference.PreferenceManager;
 import com.github.mikephil.charting.charts.BarChart;
 import com.github.mikephil.charting.components.AxisBase;
 import com.github.mikephil.charting.components.XAxis;
-import com.github.mikephil.charting.data.BarData;
-import com.github.mikephil.charting.data.BarDataSet;
-import com.github.mikephil.charting.data.BarEntry;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.formatter.ValueFormatter;
 import com.github.mikephil.charting.highlight.Highlight;
 import com.github.mikephil.charting.listener.OnChartValueSelectedListener;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
@@ -43,8 +40,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.text.DecimalFormat;
-import java.text.Format;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -55,12 +50,10 @@ import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-import de.fhws.indoor.libsmartphoneindoormap.model.Beacon;
 import de.fhws.indoor.libsmartphoneindoormap.model.Fingerprint;
 import de.fhws.indoor.libsmartphoneindoormap.model.FingerprintPath;
 import de.fhws.indoor.libsmartphoneindoormap.model.FingerprintPosition;
@@ -72,6 +65,7 @@ import de.fhws.indoor.libsmartphoneindoormap.parser.XMLMapParser;
 import de.fhws.indoor.libsmartphoneindoormap.renderer.ColorScheme;
 import de.fhws.indoor.libsmartphoneindoormap.renderer.IMapEventListener;
 import de.fhws.indoor.libsmartphoneindoormap.renderer.MapView;
+import de.fhws.indoor.libsmartphonesensors.SensorDataInterface;
 import de.fhws.indoor.libsmartphonesensors.SensorManager;
 import de.fhws.indoor.libsmartphonesensors.SensorType;
 import de.fhws.indoor.libsmartphonesensors.io.RecordingManager;
@@ -99,7 +93,6 @@ public class MainActivity extends AppCompatActivity {
     private static final long DEFAULT_FINGERPRINT_DURATION = 0; // infinite
 
     private RecordingManager recordingManager;
-    private MultiPermissionRequester permissionRequester = new MultiPermissionRequester(this);
 
     private class FingerprintFileLocations {
         private final File fingerprintsFile;
@@ -109,10 +102,10 @@ public class MainActivity extends AppCompatActivity {
 
         public FingerprintFileLocations(Context context, String uri, String tmpDir) {
             // file where exported data will be
-            fingerprintsFile = new File(getExternalFilesDir(null), uri);
+            fingerprintsFile = new File(getFilesDir(), uri);
 
             // create output directory if not exists
-            tmpFingerprintsDir = new File(getExternalFilesDir(null), tmpDir);
+            tmpFingerprintsDir = new File(getFilesDir(), tmpDir);
             if (!tmpFingerprintsDir.isDirectory()) {
                 if (!tmpFingerprintsDir.mkdir()) {
                     String msg = "Cannot create output directory: " + tmpFingerprintsDir.getPath();
@@ -232,9 +225,10 @@ public class MainActivity extends AppCompatActivity {
 
     private Fingerprint selectedFingerprint = null;
 
-    private final SensorManager sensorManager = new SensorManager();
+    private SensorManager sensorManager;
     // sensorManager status
-    private Timer sensorManagerStatisticsTimer;
+    private final Timer sensorManagerStatisticsTimer = new Timer();
+    private TimerTask sensorManagerStatisticsTask;
     private AtomicLong loadCounterWifi = new AtomicLong(0);
     private AtomicLong loadCounterWifiRTT = new AtomicLong(0);
     private AtomicLong loadCounterBeacon = new AtomicLong(0);
@@ -272,7 +266,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        recordingManager = new RecordingManager(new File(getExternalFilesDir(null), FINGERPRINTS_TMP_DIR), FILE_PROVIDER_AUTHORITY);
+        recordingManager = new RecordingManager(new File(getFilesDir(), FINGERPRINTS_TMP_DIR), FILE_PROVIDER_AUTHORITY);
         
         // filtered devices enable/disable
 
@@ -288,6 +282,11 @@ public class MainActivity extends AppCompatActivity {
         mapView = findViewById(R.id.MapView);
         mapView.setColorScheme(new ColorScheme(R.color.wallColor, R.color.unseenColor, R.color.seenColor, R.color.selectedColor));
         mPrefs = getSharedPreferences(MAP_PREFERENCES, MODE_PRIVATE);
+
+        // by default, hide all sensors
+        mapViewConfig.showUWB = false;
+        mapViewConfig.showBluetooth = false;
+        mapViewConfig.showWiFi = false;
 
         TextView lblCntBeacon = findViewById(R.id.lblCntBeacon);
         lblCntBeacon.setOnClickListener((view) -> {
@@ -473,20 +472,12 @@ public class MainActivity extends AppCompatActivity {
                         final HashMap<String, String> mac2Name;
                         if (currentMap != null) {
                             mac2Name = new HashMap<>();
-                            switch (barChartSensorType) {
-                                case IBEACON:
-                                    currentMap.getBeacons().forEach((mac, beacon) -> {
-                                        mac2Name.put(mac.toString(), beacon.name);
-                                    });
-                                    break;
-
-                                case WIFI:
-                                case WIFIRTT:
-                                    currentMap.getAccessPoints().forEach((mac, ap) -> mac2Name.put(mac.toString(), ap.name));
-                                    break;
-
-                                default:
-                                    break;
+                            if(barChartSensorType == SensorType.IBEACON) {
+                                currentMap.getBeacons().forEach((mac, beacon) -> {
+                                    mac2Name.put(mac.toString(), beacon.name);
+                                });
+                            } else if(barChartSensorType == SensorType.WIFI || barChartSensorType == SensorType.WIFIRTT) {
+                                currentMap.getAccessPoints().forEach((mac, ap) -> mac2Name.put(mac.toString(), ap.name));
                             }
                         } else {
                             mac2Name = null;
@@ -537,76 +528,55 @@ public class MainActivity extends AppCompatActivity {
             }
         }, 1000, 1000);
 
-        // setup sensorManager callbacks
-        sensorManager.addSensorListener((timestamp, sensorId, csv) -> {
-            if(currentMap == null) { return; }
+        //configure sensorManager
+        sensorManager = new SensorManager(new SensorDataInterface() {
+            @Override
+            public long getStartTimestamp() { return fingerprintFileLocations.logger.getStartTS(); }
 
-            if(sensorId == SensorType.IBEACON) {
-                currentMap.setSeenBeacon(csv.substring(0, 12));
-            } else if(sensorId == SensorType.WIFI) {
-                currentMap.setSeenWiFi(csv.substring(0, 12));
-            } else if(sensorId == SensorType.WIFIRTT) {
-                currentMap.setSeenFtm(csv.substring(2, 14));
-            } else if(sensorId == SensorType.DECAWAVE_UWB) {
-                String[] segments = csv.split(";");
-                // skip initial 4 (x, y, z, quality) - then take every 3rd
-                for(int i = 4; i < segments.length; i += 3) {
-                    int shortDeviceId = Integer.parseInt(segments[i]);
-                    // shortDeviceId is a uint16
-                    if(shortDeviceId >= 0 && shortDeviceId <= 65535) {
-                        String shortDeviceIdStr = String.format("%04X", shortDeviceId);
-                        currentMap.setSeenUWB(shortDeviceIdStr);
-                    }
+            @Override
+            public void onData(long timestamp, SensorType sensorId, String csv) {
+                if(currentMap == null) { return; }
+                String[] splitString = csv.split(";");
+
+                if (recordingFingerprint != null) {
+                    fingerprintFileLocations.write(sensorId, timestamp, csv);
                 }
-            }
-        });
 
-        //register sensorManager listener for statistics UI
-        sensorManager.addSensorListener((timestamp, id, csv) -> {
-            // update UI for WIFI/BEACON/GPS
-            String[] splitString = csv.split(";");
-            switch (id) {
-                case WIFI: {
+                if(sensorId == SensorType.IBEACON) {
+                    loadCounterBeacon.incrementAndGet();
+                    statisticsData.put(sensorId, splitString[0], Float.parseFloat(splitString[1]));
+                    currentMap.setSeenBeacon(csv.substring(0, 12));
+                } else if(sensorId == SensorType.WIFI) {
                     loadCounterWifi.incrementAndGet();
-                    statisticsData.put(id, splitString[0], Float.parseFloat(splitString[2]));
-                    break;
-                }
-                case WIFIRTT: {
+                    statisticsData.put(sensorId, splitString[0], Float.parseFloat(splitString[2]));
+                    currentMap.setSeenWiFi(csv.substring(0, 12));
+                } else if(sensorId == SensorType.WIFIRTT) {
                     loadCounterWifiRTT.incrementAndGet();
                     // ftm dist
-                    statisticsData.put(id, splitString[1], Float.parseFloat(splitString[2]) / 1000);
+                    statisticsData.put(sensorId, splitString[1], Float.parseFloat(splitString[2]) / 1000);
                     // ftm RSSI
                     statisticsData.put(SensorType.WIFI, splitString[1], Float.parseFloat(splitString[4]));
-                    break;
-                }
-                case IBEACON: {
-                    loadCounterBeacon.incrementAndGet();
-                    statisticsData.put(id, splitString[0], Float.parseFloat(splitString[1]));
-                    break;
-                }
-                case GPS: {
-                    loadCounterGPS.incrementAndGet();
-                    break;
-                }
-                case DECAWAVE_UWB: {
+                    currentMap.setSeenFtm(csv.substring(2, 14));
+                } else if(sensorId == SensorType.DECAWAVE_UWB) {
                     loadCounterUWB.incrementAndGet();
-                    break;
+                    // skip initial 4 (x, y, z, quality) - then take every 3rd
+                    for(int i = 4; i < splitString.length; i += 3) {
+                        int shortDeviceId = Integer.parseInt(splitString[i]);
+                        // shortDeviceId is a uint16
+                        if(shortDeviceId >= 0 && shortDeviceId <= 65535) {
+                            String shortDeviceIdStr = String.format("%04X", shortDeviceId);
+                            currentMap.setSeenUWB(shortDeviceIdStr);
+                        }
+                    }
+                } else if(sensorId == SensorType.GPS) {
+                    loadCounterGPS.incrementAndGet();
                 }
             }
-        });
 
-        sensorManagerStatisticsTimer = new Timer();
-        sensorManagerStatisticsTimer.scheduleAtFixedRate(new TimerTask() {
             @Override
-            public void run() {
-                updateSensorStatistics();
+            public OutputStream requestAuxiliaryChannel(String id) throws IOException {
+                return null;
             }
-        }, 250, 250);
-
-        // register sensorManager listener for fingerprint recording
-        sensorManager.addSensorListener((timestamp, id, csv) -> {
-            if (recordingFingerprint == null) { return; }
-            fingerprintFileLocations.write(id, timestamp, csv);
         });
     }
 
@@ -680,12 +650,21 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(getApplicationContext(), "Failed to start recording", Toast.LENGTH_LONG).show();
             e.printStackTrace();
         }
+
+        sensorManagerStatisticsTask = new TimerTask() {
+            @Override
+            public void run() {
+                updateSensorStatistics();
+            }
+        };
+        sensorManagerStatisticsTimer.schedule(sensorManagerStatisticsTask, 250, 250);
     }
 
     private void stopRecording() {
         assert fingerprintFileLocations != null;
         assert recordingFingerprint != null;
 
+        sensorManagerStatisticsTask.cancel();
         try {
             sensorManager.stop(this);
         } catch (Exception e) {
@@ -846,6 +825,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateSensorStatistics() {
         runOnUiThread(() -> {
+            if(fingerprintFileLocations == null) { return; }
             WiFi wifiSensor = sensorManager.getSensor(WiFi.class);
             long wifiScanResultCnt = (wifiSensor == null) ? 0 : wifiSensor.getScanResultCount();
 
@@ -868,6 +848,24 @@ public class MainActivity extends AppCompatActivity {
                     txtUWB.setText(sensorUWB.isCurrentlyConnecting() ? "⌛" : "✖");
                 }
             }
+
+            final TextView txtTotalEvtCount = findViewById(R.id.txtEvtCntTotal);
+            txtTotalEvtCount.setText(String.format(
+                getResources().getString(R.string.event_count_txt),
+                fingerprintFileLocations.logger.getEventCnt()
+            ));
+            txtTotalEvtCount.setText(fingerprintFileLocations.logger.getEventCnt() + "evts");
+
+            { // update UI timer
+                final TextView txtClock = findViewById(R.id.txtClock);
+                long now = SystemClock.elapsedRealtimeNanos();
+                long milliseconds = (now - fingerprintFileLocations.logger.getStartTS()) / 1000000;
+                long minutes = TimeUnit.MILLISECONDS.toMinutes(milliseconds);
+                milliseconds -= TimeUnit.MINUTES.toMillis(minutes);
+                long seconds = TimeUnit.MILLISECONDS.toSeconds(milliseconds);
+                milliseconds -= TimeUnit.SECONDS.toMillis(seconds);
+                txtClock.setText(String.format("%02d:%02d.%03d", minutes, seconds, milliseconds));
+            }
         });
     }
 
@@ -879,7 +877,7 @@ public class MainActivity extends AppCompatActivity {
         XMLMapParser parser = new XMLMapParser(this);
         try {
             currentMap = parser.parse(getContentResolver().openInputStream(
-                    Uri.fromFile(new File(getExternalFilesDir(null), MAP_URI))));
+                    Uri.fromFile(new File(getFilesDir(), MAP_URI))));
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
@@ -921,6 +919,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        mapView.setViewConfig(mapViewConfig);
         mapView.setMap(currentMap);
         updateFloorNames();
 
@@ -981,7 +980,9 @@ public class MainActivity extends AppCompatActivity {
         }
 
         try {
+            MultiPermissionRequester permissionRequester = new MultiPermissionRequester(this);
             sensorManager.configure(this, config, permissionRequester);
+            permissionRequester.setSuccessListener(() -> {});
             permissionRequester.launch();
         } catch (Exception e) {
             e.printStackTrace();
