@@ -74,6 +74,7 @@ import de.fhws.indoor.libsmartphonesensors.loggers.Logger;
 import de.fhws.indoor.libsmartphonesensors.loggers.TimedOrderedLogger;
 import de.fhws.indoor.libsmartphonesensors.sensors.DecawaveUWB;
 import de.fhws.indoor.libsmartphonesensors.sensors.WiFi;
+import de.fhws.indoor.libsmartphonesensors.ui.EventCounterView;
 import de.fhws.indoor.libsmartphonesensors.util.MultiPermissionRequester;
 
 /**
@@ -283,33 +284,22 @@ public class MainActivity extends AppCompatActivity {
         mapView.setColorScheme(new ColorScheme(R.color.wallColor, R.color.unseenColor, R.color.seenColor, R.color.selectedColor));
         mPrefs = getSharedPreferences(MAP_PREFERENCES, MODE_PRIVATE);
 
-        // by default, hide all sensors
-        mapViewConfig.showUWB = false;
-        mapViewConfig.showBluetooth = false;
-        mapViewConfig.showWiFi = false;
-
-        TextView lblCntBeacon = findViewById(R.id.lblCntBeacon);
-        lblCntBeacon.setOnClickListener((view) -> {
-            mapViewConfig.showBluetooth = !mapViewConfig.showBluetooth;
+        // configure event counter view
+        mapViewConfig.showFingerprint = true;
+        EventCounterView eventCounterView = findViewById(R.id.event_counter_view);
+        eventCounterView.setClickable(true);
+        eventCounterView.setActiveDataChangedCallback(activeData -> {
+            mapViewConfig.showBluetooth = activeData.ble;
+            mapViewConfig.showUWB = activeData.uwb;
+            if(mapViewConfig.showWiFi != activeData.wifi) { activeData.ftm = activeData.wifi; }
+            else if(mapViewConfig.showWiFi != activeData.ftm) { activeData.wifi = activeData.ftm; }
+            mapViewConfig.showWiFi = activeData.wifi;
+            activeData.gps = true;
             mapView.setViewConfig(mapViewConfig);
-            lblCntBeacon.setTextColor(getResources().getColor(((mapViewConfig.showBluetooth) ? R.color.white : R.color.unseenColor), getTheme()));
         });
-        TextView lblCntUWB = findViewById(R.id.lblCntUWB);
-        lblCntUWB.setOnClickListener((view) -> {
-            mapViewConfig.showUWB = !mapViewConfig.showUWB;
-            mapView.setViewConfig(mapViewConfig);
-            lblCntUWB.setTextColor(getResources().getColor(((mapViewConfig.showUWB) ? R.color.white : R.color.unseenColor), getTheme()));
+        eventCounterView.updateActiveData(true, activeData -> {
+            activeData.uwb = false; activeData.ble = false; activeData.wifi = false; activeData.ftm = false; activeData.gps = true;
         });
-        TextView lblCntWifi = findViewById(R.id.lblCntWifi);
-        TextView lblCntWifiRTT = findViewById(R.id.lblCntWifiRTT);
-        View.OnClickListener wifiClickListener = (view) -> {
-            mapViewConfig.showWiFi = !mapViewConfig.showWiFi;
-            mapView.setViewConfig(mapViewConfig);
-            lblCntWifi.setTextColor(getResources().getColor(((mapViewConfig.showWiFi) ? R.color.white : R.color.unseenColor), getTheme()));
-            lblCntWifiRTT.setTextColor(getResources().getColor(((mapViewConfig.showWiFi) ? R.color.white : R.color.unseenColor), getTheme()));
-        };
-        lblCntWifi.setOnClickListener(wifiClickListener);
-        lblCntWifiRTT.setOnClickListener(wifiClickListener);
 
         mapView.addEventListener(new IMapEventListener() {
             @Override
@@ -829,25 +819,18 @@ public class MainActivity extends AppCompatActivity {
             WiFi wifiSensor = sensorManager.getSensor(WiFi.class);
             long wifiScanResultCnt = (wifiSensor == null) ? 0 : wifiSensor.getScanResultCount();
 
-            final TextView txtWifi = (TextView) findViewById(R.id.txtEvtCntWifi);
-            txtWifi.setText(String.format(Locale.getDefault(),
-                    "%s | %d", makeStatusString(loadCounterWifi.get()), wifiScanResultCnt));
-            final TextView txtWifiRTT = (TextView) findViewById(R.id.txtEvtCntWifiRTT);
-            txtWifiRTT.setText(makeStatusString(loadCounterWifiRTT.get()));
-            final TextView txtBeacon = (TextView) findViewById(R.id.txtEvtCntBeacon);
-            txtBeacon.setText(makeStatusString(loadCounterBeacon.get()));
-            final TextView txtGPS = (TextView) findViewById(R.id.txtEvtCntGPS);
-
-            txtGPS.setText(makeStatusString(loadCounterGPS.get()));
-            final TextView txtUWB = (TextView) findViewById(R.id.txtEvtCntUWB);
-            DecawaveUWB sensorUWB = sensorManager.getSensor(DecawaveUWB.class);
-            if(sensorUWB != null) {
-                if(sensorUWB.isConnectedToTag()) {
-                    txtUWB.setText(makeStatusString(loadCounterUWB.get()));
-                } else {
-                    txtUWB.setText(sensorUWB.isCurrentlyConnecting() ? "⌛" : "✖");
-                }
-            }
+            EventCounterView evtCounterView = findViewById(R.id.event_counter_view);
+            evtCounterView.updateCounterData(counterData -> {
+                DecawaveUWB sensorUWB = sensorManager.getSensor(DecawaveUWB.class);
+                WiFi sensorWifi = sensorManager.getSensor(WiFi.class);
+                counterData.wifiEvtCnt = loadCounterWifi.get();
+                counterData.wifiScanCnt = (sensorWifi != null) ? sensorWifi.getScanResultCount() : 0;
+                counterData.bleEvtCnt = loadCounterBeacon.get();
+                counterData.ftmEvtCnt = loadCounterWifiRTT.get();
+                counterData.gpsEvtCnt = loadCounterGPS.get();
+                counterData.uwbEvtCnt = loadCounterUWB.get();
+                counterData.uwbState = EventCounterView.UWBState.from(sensorUWB);
+            });
 
             final TextView txtTotalEvtCount = findViewById(R.id.txtEvtCntTotal);
             txtTotalEvtCount.setText(String.format(
