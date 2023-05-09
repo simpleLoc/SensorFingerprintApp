@@ -267,6 +267,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        MultiPermissionRequester.init(this);
         recordingManager = new RecordingManager(new File(getFilesDir(), FINGERPRINTS_TMP_DIR), FILE_PROVIDER_AUTHORITY);
         
         // filtered devices enable/disable
@@ -574,14 +575,17 @@ public class MainActivity extends AppCompatActivity {
     protected void onStart() {
         super.onStart();
         showMap();
-        selectedFingerprint = null;
-        recordingFingerprint = null;
-        setBtnStartEnabled();
-        setBtnExportEnabled();
-        setupSensors();
-
-        // try to recover temporary fingerprint files that were aborted during recording
-        recoverTmpFingerprints();
+        if(currentMap == null) {
+            startActivity(new Intent(getApplicationContext(), SettingsActivity.class));
+        } else {
+            selectedFingerprint = null;
+            recordingFingerprint = null;
+            setBtnStartEnabled();
+            setBtnExportEnabled();
+            setupSensors();
+            // try to recover temporary fingerprint files that were aborted during recording
+            recoverTmpFingerprints();
+        }
     }
 
     @Override
@@ -816,8 +820,6 @@ public class MainActivity extends AppCompatActivity {
     private void updateSensorStatistics() {
         runOnUiThread(() -> {
             if(fingerprintFileLocations == null) { return; }
-            WiFi wifiSensor = sensorManager.getSensor(WiFi.class);
-            long wifiScanResultCnt = (wifiSensor == null) ? 0 : wifiSensor.getScanResultCount();
 
             EventCounterView evtCounterView = findViewById(R.id.event_counter_view);
             evtCounterView.updateCounterData(counterData -> {
@@ -954,7 +956,7 @@ public class MainActivity extends AppCompatActivity {
         config.hasStepDetector = activeSensors.contains("STEP_DETECTOR");
         config.hasHeadingChange = activeSensors.contains("HEADING_CHANGE");
 
-        config.decawaveUWBTagMacAddress = preferences.getString("prefDecawaveUWBTagMacAddress", "");
+        config.decawaveUWBTagMacAddress = preferences.getString("prefDecawaveUWBTagMacAddress", "AA:BB:CC:DD:EE:FF");
         config.wifiScanIntervalMSec = Long.parseLong(preferences.getString("prefWifiScanIntervalMSec", Long.toString(DEFAULT_WIFI_SCAN_INTERVAL)));
         config.ftmRangingIntervalMSec = Long.parseLong(preferences.getString("prefFtmRangingIntervalMSec", Long.toString(DEFAULT_WIFI_SCAN_INTERVAL)));
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -963,11 +965,10 @@ public class MainActivity extends AppCompatActivity {
         }
 
         try {
-            MultiPermissionRequester permissionRequester = new MultiPermissionRequester(this);
-            sensorManager.configure(this, config, permissionRequester);
-            permissionRequester.setSuccessListener(() -> {});
-            permissionRequester.launch();
+            sensorManager.configure(this, config);
+            MultiPermissionRequester.get().launch(() -> {});
         } catch (Exception e) {
+            Toast.makeText(this, "Failed to configure SensorManager", Toast.LENGTH_SHORT).show();
             e.printStackTrace();
             //TODO: ui feedback?
         }
