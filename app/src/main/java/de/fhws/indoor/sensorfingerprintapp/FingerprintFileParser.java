@@ -39,7 +39,7 @@ public class FingerprintFileParser {
 
 
     /* parsing */
-    private enum FingerprintType {
+    public enum FingerprintType {
         POINT,
         PATH
     }

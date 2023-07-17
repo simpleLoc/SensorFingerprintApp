@@ -228,6 +228,8 @@ public class MainActivity extends AppCompatActivity {
     public static Map currentMap = null;
 
     private Fingerprint selectedFingerprint = null;
+    private Fingerprint selectedPathDestination = null;
+    private FingerprintFileParser.FingerprintType fingerprintMode = FingerprintFileParser.FingerprintType.POINT;
 
     private SensorManager sensorManager;
     // sensorManager status
@@ -264,6 +266,8 @@ public class MainActivity extends AppCompatActivity {
 
     private final FilenameFilter tmpFingerprintFileFilter = (file, s) -> s.endsWith(FINGERPRINTS_TMP_EXTENSION);
     private final FilenameFilter fingerprintFileFilter = (file, s) -> s.endsWith(FINGERPRINTS_EXTENSION);
+
+    private Vibrator vibrator = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -308,17 +312,39 @@ public class MainActivity extends AppCompatActivity {
         mapView.addEventListener(new IMapEventListener() {
             @Override
             public void onTap(Vec2 mapPosition) {
-                if (selectedFingerprint != null) {
-                    selectedFingerprint.selected = false;
-                    mapView.invalidate();
-                }
-
                 Fingerprint fp = mapView.findNearestFingerprint(mapPosition, 1.0f);
-                if (fp != null) {
-                    selectedFingerprint = fp;
-                    fp.selected = true;
-                    mapView.invalidate();
-                    btnStart.setEnabled(true);
+
+                // selecting point
+                if (fingerprintMode == FingerprintFileParser.FingerprintType.POINT) {
+                    if (selectedFingerprint != null) {
+                        selectedFingerprint.selected = false;
+                        mapView.invalidate();
+                    }
+
+                    if (fp != null) {
+                        selectedFingerprint = fp;
+                        selectedFingerprint.selected = true;
+                        mapView.invalidate();
+                        if (vibrator != null) vibrator.vibrate(VibrationEffect.EFFECT_CLICK);
+                    }
+                } else { // selecting path
+                    if (fp == null) {   // deselect last
+                        if (selectedPathDestination != null) {  // deselect destination
+                            selectedPathDestination.selected = false;
+                            mapView.invalidate();
+                        } else if (selectedFingerprint != null) {   // deselect start
+                            selectedFingerprint.selected = false;
+                            mapView.invalidate();
+                        }
+                    } else {    // select destination / overwrite destination
+                        if (selectedPathDestination != null) {
+                            selectedPathDestination.selected = false;
+                        }
+
+                        selectedPathDestination = fp;
+                        selectedPathDestination.selected = true;
+                        mapView.invalidate();
+                    }
                 }
                 setBtnStartEnabled();
             }
@@ -699,7 +725,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setBtnStartEnabled() {
-        btnStart.setEnabled(selectedFingerprint != null);
+        btnStart.setEnabled(fingerprintMode == FingerprintFileParser.FingerprintType.POINT
+                ? selectedFingerprint != null
+                : selectedPathDestination != null);
     }
 
     private void setBtnExportEnabled() {
