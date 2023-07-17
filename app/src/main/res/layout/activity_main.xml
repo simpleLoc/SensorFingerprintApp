@@ -77,10 +77,23 @@
     <GridLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:columnCount="3"
+        android:columnCount="4"
         android:rowCount="2"
+        android:background="@color/black"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent">
+
+        <TextView
+            android:layout_rowSpan="2"
+            android:layout_rowWeight="1"
+            android:layout_width="wrap_content"
+            android:padding="0dp"
+            android:rotation="-90"
+            android:layout_gravity="center"
+            android:text="@string/app_version"
+            android:textAlignment="center"
+            android:textColor="#ffffff"
+            android:textSize="10dp" />
 
         <de.fhws.indoor.libsmartphonesensors.ui.EventCounterView
             android:id="@+id/event_counter_view"
@@ -92,7 +105,7 @@
             android:id="@+id/lblClock"
             android:layout_height="wrap_content"
             android:layout_gravity="fill_horizontal|left"
-            android:paddingHorizontal="3dp"
+            android:paddingRight="3dp"
             android:text="Time:"
             android:textColor="#ffffff" />
 
@@ -101,13 +114,15 @@
             android:layout_height="wrap_content"
             android:layout_gravity="fill_horizontal|left"
             android:paddingHorizontal="3dp"
+            android:background="@color/black"
             android:textColor="#ffffff" />
 
         <TextView
             android:id="@+id/lblCntTotal"
             android:layout_height="wrap_content"
             android:layout_gravity="fill_horizontal|left"
-            android:paddingHorizontal="3dp"
+            android:paddingRight="3dp"
+            android:background="@color/black"
             android:text="Total:"
             android:textSize="10dp"
             android:textColor="#ffffff" />
@@ -117,6 +132,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="fill_horizontal|left"
             android:paddingHorizontal="3dp"
+            android:background="@color/black"
             android:textColor="#ffffff"
             android:textSize="10dp"/>
 

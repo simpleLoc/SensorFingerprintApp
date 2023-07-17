@@ -10,6 +10,8 @@ import android.net.wifi.rtt.RangingRequest;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
@@ -75,7 +77,7 @@ import de.fhws.indoor.libsmartphonesensors.loggers.TimedOrderedLogger;
 import de.fhws.indoor.libsmartphonesensors.sensors.DecawaveUWB;
 import de.fhws.indoor.libsmartphonesensors.sensors.WiFi;
 import de.fhws.indoor.libsmartphonesensors.ui.EventCounterView;
-import de.fhws.indoor.libsmartphonesensors.util.MultiPermissionRequester;
+import de.fhws.indoor.libsmartphonesensors.util.permissions.AppCompatMultiPermissionRequester;
 
 /**
  * @author Steffen Kastner
@@ -93,6 +95,7 @@ public class MainActivity extends AppCompatActivity {
     private static final long DEFAULT_WIFI_SCAN_INTERVAL = (Build.VERSION.SDK_INT == 28 ? 30000 : 1);
     private static final long DEFAULT_FINGERPRINT_DURATION = 0; // infinite
 
+    private AppCompatMultiPermissionRequester permissionRequester = null;
     private RecordingManager recordingManager;
 
     private class FingerprintFileLocations {
@@ -129,7 +132,7 @@ public class MainActivity extends AppCompatActivity {
 
             recordingManager.startNewNamedSession(recording.getId().toString() + FINGERPRINTS_TMP_EXTENSION);
             writeHeader(recordingManager.getCurrentSession().stream(), selectedFingerprint);
-            logger.start(recordingManager.getCurrentSession(), new Logger.FileMetadata("Unknown", "SensorFingerprintApp"));
+            logger.start(recordingManager.getCurrentSession(), new Logger.FileMetadata("Unknown", "SensorFingerprintApp: " + android.os.Build.MODEL));
         }
 
         public void stopRecording(Fingerprint recordingFingerprint) throws IOException {
@@ -267,7 +270,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        MultiPermissionRequester.init(this);
+        permissionRequester = new AppCompatMultiPermissionRequester(this);
         recordingManager = new RecordingManager(new File(getFilesDir(), FINGERPRINTS_TMP_DIR), FILE_PROVIDER_AUTHORITY);
         
         // filtered devices enable/disable
@@ -631,7 +634,13 @@ public class MainActivity extends AppCompatActivity {
                 timeoutTask = new TimerTask() {
                     @Override
                     public void run() {
-                        runOnUiThread(() -> stopRecording());
+                        runOnUiThread(() -> {
+                            stopRecording();
+                            Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                v.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE));
+                            } else { v.vibrate(500); }
+                        });
                     }
                 };
                 timer.schedule(timeoutTask, fingerprintDuration);
@@ -965,8 +974,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         try {
-            sensorManager.configure(this, config);
-            MultiPermissionRequester.get().launch(() -> {});
+            sensorManager.configure(this, config, permissionRequester);
+            permissionRequester.launch(() -> {});
         } catch (Exception e) {
             Toast.makeText(this, "Failed to configure SensorManager", Toast.LENGTH_SHORT).show();
             e.printStackTrace();
