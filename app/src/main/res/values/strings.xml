@@ -56,5 +56,6 @@
     <string name="prefFingerprintDurationTitle">Duration of the recording (ms)</string>
     <string name="prefFtmBurstSizeSummary">Number of measurement packets per burst. 0 for default of device.</string>
     <string name="prefFtmBurstSizeTitle">FTM burst size</string>
+    <string name="btnMode_description">fingerprint moe</string>
 
 </resources>

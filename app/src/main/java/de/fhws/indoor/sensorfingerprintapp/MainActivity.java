@@ -18,6 +18,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -126,7 +127,7 @@ public class MainActivity extends AppCompatActivity {
             // check if that fingerprint was already recorded
             FingerprintRecordings.Recording recording = fingerprintRecordings.getRecording(selectedFingerprint);
             if (recording == null) {
-                recording = new FingerprintRecordings.Recording(selectedFingerprint.name, null);
+                recording = new FingerprintRecordings.Recording(selectedFingerprint, null);
                 fingerprintRecordings.addRecording(recording);
             }
 
@@ -192,28 +193,25 @@ public class MainActivity extends AppCompatActivity {
             try {
                 // write header
                 if (fingerprint instanceof FingerprintPosition) {
+                    FingerprintPosition fpPos = (FingerprintPosition) fingerprint;
                     out.write(String
                             .format(Locale.US,
-                                    "%s\nname=%s\n\n",
+                                    "%s\nname=%s\nfloorName=%s\nposition=%s\n\n",
                                     FingerprintFileParser.FINGERPRINT_POINT_TAG,
-                                    fingerprint.name)
+                                    fpPos.name,
+                                    fpPos.floorName,
+                                    fpPos.position)
                             .getBytes(StandardCharsets.UTF_8));
                 } else if (fingerprint instanceof FingerprintPath) {
                     FingerprintPath path = (FingerprintPath) fingerprint;
-
-                    StringBuilder points = new StringBuilder("[");
-                    for (String point : path.fingerprintNames) {
-                        points.append(String.format(Locale.US, "\"%s\", ", point));
-                    }
-                    // delete last comma and insert closing bracket
-                    points.delete(points.length() - 2, points.length());
-                    points.append("]");
-
                     out.write(String
                             .format(Locale.US,
-                                    "%s\npoints=%s\n\n",
+                                    "%s\nname=%s\nfloorName=%s\npoints=%s\npositions=%s\n\n",
                                     FingerprintFileParser.FINGERPRINT_PATH_TAG,
-                                    points)
+                                    path.name,
+                                    path.floorName,
+                                    FingerprintPath.fingerprintNamesToString(path.fingerprintNames),
+                                    FingerprintPath.positionsToString(path.positions))
                             .getBytes(StandardCharsets.UTF_8));
                 }
             } catch (IOException e) {
@@ -227,9 +225,7 @@ public class MainActivity extends AppCompatActivity {
     private final MapView.ViewConfig mapViewConfig = new MapView.ViewConfig();
     public static Map currentMap = null;
 
-    private Fingerprint selectedFingerprint = null;
-    private Fingerprint selectedPathDestination = null;
-    private FingerprintFileParser.FingerprintType fingerprintMode = FingerprintFileParser.FingerprintType.POINT;
+    private final ArrayList<FingerprintPosition> selectedFingerprints = new ArrayList<>();
 
     private SensorManager sensorManager;
     // sensorManager status
@@ -274,6 +270,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+
         permissionRequester = new AppCompatMultiPermissionRequester(this);
         recordingManager = new RecordingManager(new File(getFilesDir(), FINGERPRINTS_TMP_DIR), FILE_PROVIDER_AUTHORITY);
         
@@ -314,38 +312,43 @@ public class MainActivity extends AppCompatActivity {
             public void onTap(Vec2 mapPosition) {
                 Fingerprint fp = mapView.findNearestFingerprint(mapPosition, 1.0f);
 
-                // selecting point
-                if (fingerprintMode == FingerprintFileParser.FingerprintType.POINT) {
-                    if (selectedFingerprint != null) {
-                        selectedFingerprint.selected = false;
-                        mapView.invalidate();
-                    }
+                int lastIdx = selectedFingerprints.size()-1;
 
-                    if (fp != null) {
-                        selectedFingerprint = fp;
-                        selectedFingerprint.selected = true;
-                        mapView.invalidate();
-                        if (vibrator != null) vibrator.vibrate(VibrationEffect.EFFECT_CLICK);
-                    }
-                } else { // selecting path
-                    if (fp == null) {   // deselect last
-                        if (selectedPathDestination != null) {  // deselect destination
-                            selectedPathDestination.selected = false;
-                            mapView.invalidate();
-                        } else if (selectedFingerprint != null) {   // deselect start
-                            selectedFingerprint.selected = false;
+                // touched into nothingness
+                if (fp == null) {
+                    if (!selectedFingerprints.isEmpty()) {
+                        Fingerprint last = selectedFingerprints.get(lastIdx);
+                        selectedFingerprints.remove(lastIdx);
+
+                        // check if removed element is still in list somewhere
+                        if (!selectedFingerprints.contains(last)) {
+                            last.selected = false;
                             mapView.invalidate();
                         }
-                    } else {    // select destination / overwrite destination
-                        if (selectedPathDestination != null) {
-                            selectedPathDestination.selected = false;
-                        }
-
-                        selectedPathDestination = fp;
-                        selectedPathDestination.selected = true;
+                    }
+                } else if (!selectedFingerprints.isEmpty() && fp == selectedFingerprints.get(lastIdx)) {
+                    Toast.makeText(getApplicationContext(), "Cannot add same FP to the end again", Toast.LENGTH_LONG).show();
+                } else {
+                    if (selectedFingerprints.isEmpty() && fp instanceof FingerprintPath) {
+                        Toast.makeText(getApplicationContext(), "Cannot add a path to the selected path", Toast.LENGTH_LONG).show();
+                    } else if (fp instanceof FingerprintPosition){
+                        selectedFingerprints.add((FingerprintPosition) fp);
+                        fp.selected = true;
                         mapView.invalidate();
                     }
                 }
+
+                if (selectedFingerprints.isEmpty()) {
+                    mapView.setHighlightFingerprint(null);
+                } else if (selectedFingerprints.size() == 1) {
+                    Fingerprint selectedFp = selectedFingerprints.get(0);
+                    mapView.setHighlightFingerprint(selectedFp);
+                } else {
+                    Fingerprint first = selectedFingerprints.get(0);
+                    FingerprintPath fpPath = new FingerprintPath(first.floorName, true, false, selectedFingerprints);
+                    mapView.setHighlightFingerprint(fpPath);
+                }
+
                 setBtnStartEnabled();
             }
 
@@ -607,7 +610,7 @@ public class MainActivity extends AppCompatActivity {
         if(currentMap == null) {
             startActivity(new Intent(getApplicationContext(), SettingsActivity.class));
         } else {
-            selectedFingerprint = null;
+            selectedFingerprints.clear();
             recordingFingerprint = null;
             setBtnStartEnabled();
             setBtnExportEnabled();
@@ -635,7 +638,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void startRecording() {
         assert fingerprintFileLocations != null;
-        assert selectedFingerprint != null;
+        assert !selectedFingerprints.isEmpty();
         assert timeoutTask == null;
 
         // reset bottom left sensor statistics table
@@ -645,11 +648,19 @@ public class MainActivity extends AppCompatActivity {
         statisticsData.clear();
 
         try {
-            fingerprintFileLocations.startRecording(selectedFingerprint);
+            Fingerprint fromSelectedFingerprints;
+            if (selectedFingerprints.size() > 1) {
+                FingerprintPosition first = selectedFingerprints.get(0);
+                fromSelectedFingerprints = new FingerprintPath(first.floorName, true, false, selectedFingerprints);
+            } else {
+                fromSelectedFingerprints = selectedFingerprints.get(0);
+            }
+
+            fingerprintFileLocations.startRecording(fromSelectedFingerprints);
 
             sensorManager.start(this);
             btnStart.setText(R.string.stop_button_text);
-            recordingFingerprint = selectedFingerprint;
+            recordingFingerprint = fromSelectedFingerprints;
 
             setBtnExportEnabled();
             setBtnSettingsEnabled();
@@ -662,10 +673,7 @@ public class MainActivity extends AppCompatActivity {
                     public void run() {
                         runOnUiThread(() -> {
                             stopRecording();
-                            Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                v.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE));
-                            } else { v.vibrate(500); }
+                            vibrator.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE));
                         });
                     }
                 };
@@ -725,9 +733,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setBtnStartEnabled() {
-        btnStart.setEnabled(fingerprintMode == FingerprintFileParser.FingerprintType.POINT
-                ? selectedFingerprint != null
-                : selectedPathDestination != null);
+        btnStart.setEnabled(!selectedFingerprints.isEmpty());
     }
 
     private void setBtnExportEnabled() {
@@ -811,7 +817,7 @@ public class MainActivity extends AppCompatActivity {
                         builder
                                 .setTitle(R.string.recover_temporary_fingerprint_title)
                                 .setMessage(String.format(Locale.getDefault(),
-                                        "%s %s?\nRecorded at: %s", getString(R.string.recover_temporary_fingerprint_msg), r.fingerprintName,
+                                        "%s %s?\nRecorded at: %s", getString(R.string.recover_temporary_fingerprint_msg), r.getFingerprint().name,
                                         new Date(fpFile.lastModified())))
                                 .setNegativeButton(R.string.dialog_no, null)
                                 .setPositiveButton(R.string.dialog_yes, (DialogInterface dialog, int id) -> recoverTmpFingerprint(r, fpFile));
@@ -964,11 +970,20 @@ public class MainActivity extends AppCompatActivity {
     private void updateRecordedState() {
         if (currentMap == null) { return; }
 
-        for (Floor floor : currentMap.getFloors().values()) {
-            for (Fingerprint fp : floor.getFingerprints().values()) {
-                if (fingerprintRecordings.contains(fp)) {
-                    fp.recorded = true;
-                }
+        for (FingerprintRecordings.Recording r : fingerprintRecordings.getRecordings().values()) {
+            Fingerprint fp = r.getFingerprint();
+            Floor floor = currentMap.getFloors().get(fp.floorName);
+            if (floor == null) {
+                Toast.makeText(getApplicationContext(), "Floor of fingerprint recording not found! Floor name: " + fp.floorName, Toast.LENGTH_LONG).show();
+                continue;
+            }
+
+            Fingerprint floorFp = floor.getFingerprints().get(fp.name);
+            if (floorFp != null) {
+                floorFp.recorded = true;
+            } else {
+                // added fingerprint which is only in recording
+                floor.addFingerprint(fp);
             }
         }
     }

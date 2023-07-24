@@ -1,5 +1,7 @@
 package de.fhws.indoor.sensorfingerprintapp;
 
+import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 
 import java.io.BufferedReader;
@@ -10,6 +12,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import de.fhws.indoor.libsmartphoneindoormap.model.FingerprintPath;
+import de.fhws.indoor.libsmartphoneindoormap.model.FingerprintPosition;
+import de.fhws.indoor.libsmartphoneindoormap.model.Vec3;
 
 public class FingerprintFileParser {
     public static final String FINGERPRINT_POINT_TAG = "[fingerprint:point]";
@@ -55,15 +61,43 @@ public class FingerprintFileParser {
                 data = parseData();
             }
             if (type == FingerprintType.POINT) {
-                if(!headerFields.containsKey("name")) { continue; } // bail out on this one! Invalid!
                 String name = headerFields.get("name");
-                return new FingerprintRecordings.Recording(name, data);
+                String floorName = headerFields.get("floorName");
+                String position = headerFields.get("position");
+
+                if(name == null || floorName == null || position == null) {
+                    continue; // bail out on this one! Invalid!
+                }
+
+                FingerprintPosition fpPos = new FingerprintPosition(name, floorName, false, true, Vec3.parseVec3(position));
+                return new FingerprintRecordings.Recording(fpPos, data);
             } else if (type == FingerprintType.PATH) {
-                if(!headerFields.containsKey("points")) { continue; } // bail out on this one! Invalid!
-                String pointsString = headerFields.get("points");
-                if(pointsString == null) { continue; }
-                ArrayList<String> points = parseArrayAttribute(pointsString);
-                return new FingerprintRecordings.Recording(points, data);
+                String name = headerFields.get("name");
+                String floorName = headerFields.get("floorName");
+                String fingerprintNamesString = headerFields.get("points");
+                String positionsString = headerFields.get("positions");
+
+                if(name == null || floorName == null || fingerprintNamesString == null || positionsString == null) {
+                    continue; // bail out on this one! Invalid!
+                }
+
+                ArrayList<String> fingerprintNames = parseArrayAttribute(fingerprintNamesString);
+                if (fingerprintNames == null) { continue; } // could not parse fingerprint names
+
+                ArrayList<String> positionStringArr = parseArrayAttribute(positionsString);
+                if (positionStringArr == null) { continue; } // could not parse positions
+
+                ArrayList<FingerprintPosition> fingerprintPositions = new ArrayList<>();
+                for (int i = 0; i < fingerprintNames.size(); ++i) {
+                    String fpName = fingerprintNames.get(i);
+                    String positionStr = positionStringArr.get(i);
+
+                    FingerprintPosition fpPos = new FingerprintPosition(fpName, floorName, false, false, Vec3.parseVec3(positionStr));
+                    fingerprintPositions.add(fpPos);
+                }
+
+                FingerprintPath fpPath = new FingerprintPath(floorName, false, true, fingerprintPositions);
+                return new FingerprintRecordings.Recording(fpPath, data);
             }
         }
     }
