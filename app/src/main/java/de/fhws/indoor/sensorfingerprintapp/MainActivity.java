@@ -5,10 +5,13 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.net.wifi.rtt.RangingRequest;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.CancellationSignal;
 import android.os.SystemClock;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
@@ -26,6 +29,7 @@ import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.FileProvider;
 import androidx.preference.PreferenceManager;
 
 import com.github.mikephil.charting.charts.BarChart;
@@ -47,6 +51,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
@@ -183,6 +188,17 @@ public class MainActivity extends AppCompatActivity {
                     Log.e(STREAM_TAG, e.toString());
                     Toast.makeText(getApplicationContext(), "Cannot close output file!", Toast.LENGTH_LONG).show();
                 }
+                Uri path = FileProvider.getUriForFile(MainActivity.this, FILE_PROVIDER_AUTHORITY, fingerprintsFile);
+                Intent i = new Intent(Intent.ACTION_SEND);
+                i.putExtra(Intent.EXTRA_TEXT, "Share Recording");
+                i.putExtra(Intent.EXTRA_STREAM, path);
+                i.setType("text/plain");
+                List<ResolveInfo> resInfoList = MainActivity.this.getPackageManager().queryIntentActivities(i, PackageManager.MATCH_DEFAULT_ONLY);
+                for (ResolveInfo resolveInfo : resInfoList) {
+                    String packageName = resolveInfo.activityInfo.packageName;
+                    MainActivity.this.grantUriPermission(packageName, path, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                }
+                MainActivity.this.startActivity(Intent.createChooser(i, "Share Recording"));
             }
         }
 
