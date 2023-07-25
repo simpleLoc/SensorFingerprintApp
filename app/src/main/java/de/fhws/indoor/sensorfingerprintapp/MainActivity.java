@@ -63,6 +63,7 @@ import de.fhws.indoor.libsmartphoneindoormap.model.FingerprintPosition;
 import de.fhws.indoor.libsmartphoneindoormap.model.Floor;
 import de.fhws.indoor.libsmartphoneindoormap.model.Map;
 import de.fhws.indoor.libsmartphoneindoormap.model.Vec2;
+import de.fhws.indoor.libsmartphoneindoormap.model.Vec3;
 import de.fhws.indoor.libsmartphoneindoormap.parser.MapSeenSerializer;
 import de.fhws.indoor.libsmartphoneindoormap.parser.XMLMapParser;
 import de.fhws.indoor.libsmartphoneindoormap.renderer.ColorScheme;
@@ -196,9 +197,10 @@ public class MainActivity extends AppCompatActivity {
                     FingerprintPosition fpPos = (FingerprintPosition) fingerprint;
                     out.write(String
                             .format(Locale.US,
-                                    "%s\nname=%s\nfloorName=%s\nposition=%s\n\n",
+                                    "%s\nname=%s\nfloorIdx=%s\nfloorName=%s\nposition=%s\n\n",
                                     FingerprintFileParser.FINGERPRINT_POINT_TAG,
                                     fpPos.name,
+                                    fpPos.floorIdx,
                                     fpPos.floorName,
                                     fpPos.position)
                             .getBytes(StandardCharsets.UTF_8));
@@ -206,9 +208,10 @@ public class MainActivity extends AppCompatActivity {
                     FingerprintPath path = (FingerprintPath) fingerprint;
                     out.write(String
                             .format(Locale.US,
-                                    "%s\nname=%s\nfloorName=%s\npoints=%s\npositions=%s\n\n",
+                                    "%s\nname=%s\nfloorIdx=%s\nfloorName=%s\npoints=%s\npositions=%s\n\n",
                                     FingerprintFileParser.FINGERPRINT_PATH_TAG,
                                     path.name,
+                                    path.floorIdx,
                                     path.floorName,
                                     FingerprintPath.fingerprintNamesToString(path.fingerprintNames),
                                     FingerprintPath.positionsToString(path.positions))
@@ -345,7 +348,7 @@ public class MainActivity extends AppCompatActivity {
                     mapView.setHighlightFingerprint(selectedFp);
                 } else {
                     Fingerprint first = selectedFingerprints.get(0);
-                    FingerprintPath fpPath = new FingerprintPath(first.floorName, true, false, selectedFingerprints);
+                    FingerprintPath fpPath = new FingerprintPath(first.floorIdx, first.floorName, true, false, selectedFingerprints);
                     mapView.setHighlightFingerprint(fpPath);
                 }
 
@@ -354,7 +357,41 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onLongPress(Vec2 mapPosition) {
+                FingerprintPosition fp = new FingerprintPosition("rfp_", mapView.getCurrentFloor().getIdx(), mapView.getCurrentFloor().getName(), false, false, new Vec3(mapPosition.x, mapPosition.y, 1.3f));
+                openCreateFingerprintDialog(fp);
+            }
 
+            private void openCreateFingerprintDialog(FingerprintPosition fp) {
+                DialogCreateFingerprint dialogCreateFingerprint = new DialogCreateFingerprint(fp, currentMap);
+                DialogInterface.OnClickListener onClickListener = new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int i) {
+                        fp.selected = true;
+
+                        Floor fpFloor = null;
+                        try {
+                            fpFloor = currentMap.getFloors().get(fp.floorIdx);
+                        } catch (ArrayIndexOutOfBoundsException exception) {
+                            Toast.makeText(getApplicationContext(), "Floor of created fingerprint does not exists!", Toast.LENGTH_LONG).show();
+                            openCreateFingerprintDialog(fp);
+                            return;
+                        }
+
+                        if (fpFloor.getFingerprints().containsKey(fp.name)) {
+                            Toast.makeText(getApplicationContext(), "Floor already contains a fingerprint with that name!", Toast.LENGTH_LONG).show();
+                            openCreateFingerprintDialog(fp);
+                            return;
+                        }
+
+                        fpFloor.addFingerprint(fp);
+                        mapView.invalidate();
+
+                        selectedFingerprints.add(fp);
+                        setBtnStartEnabled();
+                    }
+                };
+                dialogCreateFingerprint.setOnCreateListener(onClickListener);
+                dialogCreateFingerprint.show(getSupportFragmentManager(), "CreateFingerprintDialog");
             }
 
             @Override
@@ -400,10 +437,10 @@ public class MainActivity extends AppCompatActivity {
                 String floorName = (String) adapterView.getItemAtPosition(i);
 
                 SharedPreferences.Editor ed = mPrefs.edit();
-                ed.putString(MAP_PREFERENCES_FLOOR, floorName);
+                ed.putInt(MAP_PREFERENCES_FLOOR, i);
                 ed.apply();
 
-                mapView.selectFloor(floorName);
+                mapView.selectFloor(i);
             }
 
             @Override
@@ -651,7 +688,7 @@ public class MainActivity extends AppCompatActivity {
             Fingerprint fromSelectedFingerprints;
             if (selectedFingerprints.size() > 1) {
                 FingerprintPosition first = selectedFingerprints.get(0);
-                fromSelectedFingerprints = new FingerprintPath(first.floorName, true, false, selectedFingerprints);
+                fromSelectedFingerprints = new FingerprintPath(first.floorIdx, first.floorName, true, false, selectedFingerprints);
             } else {
                 fromSelectedFingerprints = selectedFingerprints.get(0);
             }
@@ -951,19 +988,18 @@ public class MainActivity extends AppCompatActivity {
         mapView.setMap(currentMap);
         updateFloorNames();
 
-        String floorName = mPrefs.getString(MAP_PREFERENCES_FLOOR, null);
-        if (floorName != null) {
-            mapView.selectFloor(floorName);
+        int floorIdx = mPrefs.getInt(MAP_PREFERENCES_FLOOR, -1);
+        if (floorIdx != -1) {
+            mapView.selectFloor(floorIdx);
             Spinner spinnerFloor = findViewById(R.id.spinner_selectFloor);
-            int position = mFloorNameAdapter.getPosition(floorName);
-            spinnerFloor.setSelection(position);
+            spinnerFloor.setSelection(floorIdx);
         }
     }
 
     private void updateFloorNames() {
         if (currentMap != null) {
             mFloorNameAdapter.clear();
-            currentMap.getFloors().keySet().stream().sorted().forEach(s -> mFloorNameAdapter.add(s));
+            currentMap.getFloors().stream().map(Floor::getName).sorted().forEach(s -> mFloorNameAdapter.add(s));
         }
     }
 
@@ -972,7 +1008,7 @@ public class MainActivity extends AppCompatActivity {
 
         for (FingerprintRecordings.Recording r : fingerprintRecordings.getRecordings().values()) {
             Fingerprint fp = r.getFingerprint();
-            Floor floor = currentMap.getFloors().get(fp.floorName);
+            Floor floor = currentMap.getFloors().get(fp.floorIdx);
             if (floor == null) {
                 Toast.makeText(getApplicationContext(), "Floor of fingerprint recording not found! Floor name: " + fp.floorName, Toast.LENGTH_LONG).show();
                 continue;

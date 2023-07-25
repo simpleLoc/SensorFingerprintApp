@@ -57,5 +57,12 @@
     <string name="prefFtmBurstSizeSummary">Number of measurement packets per burst. 0 for default of device.</string>
     <string name="prefFtmBurstSizeTitle">FTM burst size</string>
     <string name="btnMode_description">fingerprint moe</string>
-
+    <string name="dialog_create_fingerprint_label_x">X:</string>
+    <string name="dialog_create_fingerprint_label_y">Y:</string>
+    <string name="dialog_create_fingerprint_label_z">Z:</string>
+    <string name="dialog_create_fingerprint_label_floorname">Floor name:</string>
+    <string name="dialog_create_fingerprint_label_name">Name:</string>
+    <string name="dialog_create_fingerprint_title">Create Fingerprint</string>
+    <string name="dialog_create_fingerprint_create">Create</string>
+    <string name="dialog_create_fingerprint_cancel">Cancel</string>
 </resources>

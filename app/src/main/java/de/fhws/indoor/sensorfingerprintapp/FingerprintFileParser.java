@@ -62,24 +62,30 @@ public class FingerprintFileParser {
             }
             if (type == FingerprintType.POINT) {
                 String name = headerFields.get("name");
+                String floorIdxString = headerFields.get("floorIdx");
                 String floorName = headerFields.get("floorName");
                 String position = headerFields.get("position");
 
-                if(name == null || floorName == null || position == null) {
+                if(name == null || floorIdxString == null || floorName == null || position == null) {
                     continue; // bail out on this one! Invalid!
                 }
 
-                FingerprintPosition fpPos = new FingerprintPosition(name, floorName, false, true, Vec3.parseVec3(position));
+                int floorIdx = Integer.parseInt(floorIdxString);
+
+                FingerprintPosition fpPos = new FingerprintPosition(name, floorIdx, floorName, false, true, Vec3.parseVec3(position));
                 return new FingerprintRecordings.Recording(fpPos, data);
             } else if (type == FingerprintType.PATH) {
                 String name = headerFields.get("name");
+                String floorIdxString = headerFields.get("floorIdx");
                 String floorName = headerFields.get("floorName");
                 String fingerprintNamesString = headerFields.get("points");
                 String positionsString = headerFields.get("positions");
 
-                if(name == null || floorName == null || fingerprintNamesString == null || positionsString == null) {
+                if(name == null || floorIdxString == null || floorName == null || fingerprintNamesString == null || positionsString == null) {
                     continue; // bail out on this one! Invalid!
                 }
+
+                int floorIdx = Integer.parseInt(floorIdxString);
 
                 ArrayList<String> fingerprintNames = parseArrayAttribute(fingerprintNamesString);
                 if (fingerprintNames == null) { continue; } // could not parse fingerprint names
@@ -92,11 +98,11 @@ public class FingerprintFileParser {
                     String fpName = fingerprintNames.get(i);
                     String positionStr = positionStringArr.get(i);
 
-                    FingerprintPosition fpPos = new FingerprintPosition(fpName, floorName, false, false, Vec3.parseVec3(positionStr));
+                    FingerprintPosition fpPos = new FingerprintPosition(fpName, floorIdx, floorName, false, false, Vec3.parseVec3(positionStr));
                     fingerprintPositions.add(fpPos);
                 }
 
-                FingerprintPath fpPath = new FingerprintPath(floorName, false, true, fingerprintPositions);
+                FingerprintPath fpPath = new FingerprintPath(floorIdx, floorName, false, true, fingerprintPositions);
                 return new FingerprintRecordings.Recording(fpPath, data);
             }
         }
