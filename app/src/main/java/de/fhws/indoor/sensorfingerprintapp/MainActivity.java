@@ -1,6 +1,8 @@
 package de.fhws.indoor.sensorfingerprintapp;
 
 import android.app.AlertDialog;
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -12,9 +14,11 @@ import android.net.wifi.rtt.RangingRequest;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CancellationSignal;
+import android.os.Environment;
 import android.os.SystemClock;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
@@ -166,10 +170,37 @@ public class MainActivity extends AppCompatActivity {
             logger.addCSV(id, timestamp, csv);
         }
 
+        private Uri getUri(String displayName, String mimeType) throws IOException {
+            final ContentValues values = new ContentValues();
+            values.put(MediaStore.MediaColumns.DISPLAY_NAME, displayName);
+            values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType);
+            values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOCUMENTS + File.separator + "SensorFingerprintApp");
+
+            final ContentResolver resolver = getContentResolver();
+            Uri uri = null;
+
+            final Uri contentUri = MediaStore.Files.getContentUri("external");
+            uri = resolver.insert(contentUri, values);
+
+            if (uri == null)
+                throw new IOException("Failed to create new MediaStore record.");
+
+            return uri;
+        }
+
         public void export() {
             File[] files = tmpFingerprintsDir.listFiles();
             if (files != null) {
-                try (OutputStream out = getContentResolver().openOutputStream(Uri.fromFile(fingerprintsFile), "wt")) {
+                Uri outputDoc = null;
+                try {
+                    outputDoc = getUri(FINGERPRINTS_URI, "text/*");
+                } catch (IOException e) {
+                    Log.e(STREAM_TAG, e.toString());
+                    Toast.makeText(getApplicationContext(), "Cannot create output file!", Toast.LENGTH_LONG).show();
+                    return;
+                }
+
+                try (OutputStream out = getContentResolver().openOutputStream(outputDoc /*Uri.fromFile(fingerprintsFile)*/, "wt")) {
                     for (File fpFile : files) {
                         try (InputStream in = getContentResolver().openInputStream(Uri.fromFile(fpFile))) {
                             appendToOutputStream(in, out);
@@ -184,9 +215,11 @@ public class MainActivity extends AppCompatActivity {
                 } catch (FileNotFoundException e) {
                     Log.e(STREAM_TAG, e.toString());
                     Toast.makeText(getApplicationContext(), "Cannot open output file!", Toast.LENGTH_LONG).show();
+                    return;
                 } catch (IOException e) {
                     Log.e(STREAM_TAG, e.toString());
                     Toast.makeText(getApplicationContext(), "Cannot close output file!", Toast.LENGTH_LONG).show();
+                    return;
                 }
                 Uri path = FileProvider.getUriForFile(MainActivity.this, FILE_PROVIDER_AUTHORITY, fingerprintsFile);
                 Intent i = new Intent(Intent.ACTION_SEND);
