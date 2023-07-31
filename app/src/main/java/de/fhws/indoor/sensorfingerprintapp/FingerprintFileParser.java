@@ -8,10 +8,13 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.time.temporal.ValueRange;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import de.fhws.indoor.libsmartphoneindoormap.model.FingerprintPath;
 import de.fhws.indoor.libsmartphoneindoormap.model.FingerprintPosition;
@@ -64,7 +67,7 @@ public class FingerprintFileParser {
                 String name = headerFields.get("name");
                 String floorIdxString = headerFields.get("floorIdx");
                 String floorName = headerFields.get("floorName");
-                String position = headerFields.get("position");
+                Vec3 position = parseVec3(headerFields.get("position"));
 
                 if(name == null || floorIdxString == null || floorName == null || position == null) {
                     continue; // bail out on this one! Invalid!
@@ -72,33 +75,27 @@ public class FingerprintFileParser {
 
                 int floorIdx = Integer.parseInt(floorIdxString);
 
-                FingerprintPosition fpPos = new FingerprintPosition(name, floorIdx, floorName, false, true, Vec3.parseVec3(position));
+                FingerprintPosition fpPos = new FingerprintPosition(name, floorIdx, floorName, false, true, position);
                 return new FingerprintRecordings.Recording(fpPos, data);
             } else if (type == FingerprintType.PATH) {
                 String name = headerFields.get("name");
                 String floorIdxString = headerFields.get("floorIdx");
                 String floorName = headerFields.get("floorName");
-                String fingerprintNamesString = headerFields.get("points");
-                String positionsString = headerFields.get("positions");
+                ArrayList<String> fingerprintNames = parseStringArrayAttribute(headerFields, "fpNames");
+                ArrayList<Vec3> positions = parseVecArrayAttribute(headerFields, "positions");
 
-                if(name == null || floorIdxString == null || floorName == null || fingerprintNamesString == null || positionsString == null) {
+                if(name == null || floorIdxString == null || floorName == null || fingerprintNames == null || positions == null) {
                     continue; // bail out on this one! Invalid!
                 }
 
                 int floorIdx = Integer.parseInt(floorIdxString);
 
-                ArrayList<String> fingerprintNames = parseArrayAttribute(fingerprintNamesString);
-                if (fingerprintNames == null) { continue; } // could not parse fingerprint names
-
-                ArrayList<String> positionStringArr = parseArrayAttribute(positionsString);
-                if (positionStringArr == null) { continue; } // could not parse positions
-
                 ArrayList<FingerprintPosition> fingerprintPositions = new ArrayList<>();
                 for (int i = 0; i < fingerprintNames.size(); ++i) {
                     String fpName = fingerprintNames.get(i);
-                    String positionStr = positionStringArr.get(i);
+                    Vec3 position = positions.get(i);
 
-                    FingerprintPosition fpPos = new FingerprintPosition(fpName, floorIdx, floorName, false, false, Vec3.parseVec3(positionStr));
+                    FingerprintPosition fpPos = new FingerprintPosition(fpName, floorIdx, floorName, false, false, position);
                     fingerprintPositions.add(fpPos);
                 }
 
@@ -145,15 +142,29 @@ public class FingerprintFileParser {
         }
     }
 
-    static final Pattern arrayAttributePattern = Pattern.compile("\"([^\"]*)\"");
-    private ArrayList<String> parseArrayAttribute(String value) {
+    static Vec3 parseVec3(String vecStr) {
+        if(vecStr == null) { return null; }
+        if(!vecStr.startsWith("(") || !vecStr.endsWith(")")) { return null; }
+        vecStr = vecStr.substring(1, vecStr.length() - 1);
+        String[] vecParts = vecStr.split(";");
+        if(vecParts.length != 3) { return null; }
+        return new Vec3(Float.parseFloat(vecParts[0]), Float.parseFloat(vecParts[1]), Float.parseFloat(vecParts[2]));
+    }
+
+    private ArrayList<String> parseStringArrayAttribute(HashMap<String, String> headerFields, String arrayName) {
+        if(!headerFields.containsKey(arrayName + "[]")) { return null; }
+        int arrLen = Integer.parseInt(Objects.requireNonNull(headerFields.get(arrayName + "[]")));
         ArrayList<String> result = new ArrayList<>();
-        if(!value.startsWith("[") || !value.endsWith("]")) { return null; }
-        value = value.substring(1, value.length() - 1);
-        for (Matcher m = arrayAttributePattern.matcher(value); m.find(); ) {
-            result.add(m.group(1));
+        for(int i = 0; i < arrLen; ++i) {
+            result.add(headerFields.get(arrayName + "[" + i + "]"));
         }
         return result;
+    }
+
+    private ArrayList<Vec3> parseVecArrayAttribute(HashMap<String, String> headerFields, String arrayName) {
+        return new ArrayList<Vec3>(parseStringArrayAttribute(headerFields, arrayName).stream()
+                .map(s -> parseVec3(s)).filter(v -> v != null)
+                .collect(Collectors.toList()));
     }
 
     private String nextLine() throws IOException {
