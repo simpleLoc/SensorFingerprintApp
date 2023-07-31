@@ -50,7 +50,9 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.time.temporal.ValueRange;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -239,33 +241,11 @@ public class MainActivity extends AppCompatActivity {
             return new File(tmpFingerprintsDir, recording.getId().toString() + extension);
         }
 
+
+        // write header
         private void writeHeader(OutputStream out, Fingerprint fingerprint) {
             try {
-                // write header
-                if (fingerprint instanceof FingerprintPosition) {
-                    FingerprintPosition fpPos = (FingerprintPosition) fingerprint;
-                    out.write(String
-                            .format(Locale.US,
-                                    "%s\nname=%s\nfloorIdx=%s\nfloorName=%s\nposition=%s\n\n",
-                                    FingerprintFileParser.FINGERPRINT_POINT_TAG,
-                                    fpPos.name,
-                                    fpPos.floorIdx,
-                                    fpPos.floorName,
-                                    fpPos.position)
-                            .getBytes(StandardCharsets.UTF_8));
-                } else if (fingerprint instanceof FingerprintPath) {
-                    FingerprintPath path = (FingerprintPath) fingerprint;
-                    out.write(String
-                            .format(Locale.US,
-                                    "%s\nname=%s\nfloorIdx=%s\nfloorName=%s\npoints=%s\npositions=%s\n\n",
-                                    FingerprintFileParser.FINGERPRINT_PATH_TAG,
-                                    path.name,
-                                    path.floorIdx,
-                                    path.floorName,
-                                    FingerprintPath.fingerprintNamesToString(path.fingerprintNames),
-                                    FingerprintPath.positionsToString(path.positions))
-                            .getBytes(StandardCharsets.UTF_8));
-                }
+                FingerprintFileSerializer.writeHeader(out, fingerprint);
             } catch (IOException e) {
                 Log.e(STREAM_TAG, e.toString());
                 Toast.makeText(getApplicationContext(), "Cannot write header to output file!", Toast.LENGTH_LONG).show();

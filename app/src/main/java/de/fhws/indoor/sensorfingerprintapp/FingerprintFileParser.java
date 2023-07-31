@@ -162,7 +162,7 @@ public class FingerprintFileParser {
     }
 
     private ArrayList<Vec3> parseVecArrayAttribute(HashMap<String, String> headerFields, String arrayName) {
-        return new ArrayList<Vec3>(parseStringArrayAttribute(headerFields, arrayName).stream()
+        return new ArrayList<>(parseStringArrayAttribute(headerFields, arrayName).stream()
                 .map(s -> parseVec3(s)).filter(v -> v != null)
                 .collect(Collectors.toList()));
     }
