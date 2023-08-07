@@ -258,6 +258,7 @@ public class MainActivity extends AppCompatActivity {
     public static Map currentMap = null;
 
     private final ArrayList<FingerprintPosition> selectedFingerprints = new ArrayList<>();
+    private FingerprintPath selectedFingerprintPath = null;
 
     private SensorManager sensorManager;
     // sensorManager status
@@ -348,6 +349,7 @@ public class MainActivity extends AppCompatActivity {
 
                 // touched into nothingness
                 if (fp == null) {
+                    // deselect last fingerprint
                     if (!selectedFingerprints.isEmpty()) {
                         Fingerprint last = selectedFingerprints.get(lastIdx);
                         selectedFingerprints.remove(lastIdx);
@@ -358,20 +360,44 @@ public class MainActivity extends AppCompatActivity {
                             mapView.invalidate();
                         }
                     }
-                } else if (!selectedFingerprints.isEmpty() && fp == selectedFingerprints.get(lastIdx)) {
-                    Toast.makeText(getApplicationContext(), "Cannot add same FP to the end again", Toast.LENGTH_LONG).show();
-                } else {
-                    if (selectedFingerprints.isEmpty() && fp instanceof FingerprintPath) {
-                        Toast.makeText(getApplicationContext(), "Cannot add a path to the selected path", Toast.LENGTH_LONG).show();
-                    } else if (fp instanceof FingerprintPosition){
+                    // deselect path
+                    if (selectedFingerprintPath != null) {
+                        selectedFingerprintPath.selected = false;
+                        selectedFingerprintPath = null;
+                    }
+                } else if (fp instanceof FingerprintPosition) { // touched FingerprintPosition
+                    // check if fingerprint position can be added
+                    if (selectedFingerprintPath != null) {
+                        // there is already a path selected
+                        Toast.makeText(getApplicationContext(), "Cannot add a fingerprint position to an existing path", Toast.LENGTH_LONG).show();
+                    } else if (!selectedFingerprints.isEmpty() && fp == selectedFingerprints.get(lastIdx)) {
+                        // selected path end point again
+                        Toast.makeText(getApplicationContext(), "Cannot add same FP to the end again", Toast.LENGTH_LONG).show();
+                    } else {
+                        // selected new position, so add it to the new path
                         selectedFingerprints.add((FingerprintPosition) fp);
+                        fp.selected = true;
+                        mapView.invalidate();
+                    }
+                } else if (fp instanceof FingerprintPath) { // touched FingerprintPath
+                    // check if there are points selected or another path
+                    if (!selectedFingerprints.isEmpty()) {
+                        Toast.makeText(getApplicationContext(), "Cannot add a path to the selected fingerprint positions", Toast.LENGTH_LONG).show();
+                    } else if (selectedFingerprintPath != null) {
+                        Toast.makeText(getApplicationContext(), "A path is already selected, cannot select another path", Toast.LENGTH_LONG).show();
+                    } else {
+                        // nothing selected, so select the path
+                        selectedFingerprintPath = (FingerprintPath) fp;
                         fp.selected = true;
                         mapView.invalidate();
                     }
                 }
 
-                if (selectedFingerprints.isEmpty()) {
+                // highlight selection
+                if (selectedFingerprints.isEmpty() && selectedFingerprintPath == null) {
                     mapView.setHighlightFingerprint(null);
+                } else if (selectedFingerprintPath != null) {
+                    mapView.setHighlightFingerprint(selectedFingerprintPath);
                 } else if (selectedFingerprints.size() == 1) {
                     Fingerprint selectedFp = selectedFingerprints.get(0);
                     mapView.setHighlightFingerprint(selectedFp);
@@ -704,7 +730,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void startRecording() {
         assert fingerprintFileLocations != null;
-        assert !selectedFingerprints.isEmpty();
+        assert !selectedFingerprints.isEmpty() || selectedFingerprintPath != null;
         assert timeoutTask == null;
 
         // reset bottom left sensor statistics table
@@ -715,7 +741,9 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             Fingerprint fromSelectedFingerprints;
-            if (selectedFingerprints.size() > 1) {
+            if (selectedFingerprintPath != null) {
+                fromSelectedFingerprints = selectedFingerprintPath;
+            } else if (selectedFingerprints.size() > 1) {
                 FingerprintPosition first = selectedFingerprints.get(0);
                 fromSelectedFingerprints = new FingerprintPath(first.floorIdx, first.floorName, true, false, selectedFingerprints);
             } else {
@@ -733,7 +761,7 @@ public class MainActivity extends AppCompatActivity {
 
             // schedule timeoutTask to stop recording after fingerprintDuration
             long fingerprintDuration = Long.parseLong(PreferenceManager.getDefaultSharedPreferences(this).getString("prefFingerprintDurationMSec", Long.toString(DEFAULT_FINGERPRINT_DURATION)));
-            if (fingerprintDuration != 0) {
+            if (fingerprintDuration != 0 && selectedFingerprintPath == null) {
                 timeoutTask = new TimerTask() {
                     @Override
                     public void run() {
@@ -799,7 +827,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setBtnStartEnabled() {
-        btnStart.setEnabled(!selectedFingerprints.isEmpty());
+        btnStart.setEnabled(!selectedFingerprints.isEmpty() || selectedFingerprintPath != null);
     }
 
     private void setBtnExportEnabled() {
