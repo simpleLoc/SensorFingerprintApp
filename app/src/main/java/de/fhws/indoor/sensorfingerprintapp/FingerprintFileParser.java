@@ -81,7 +81,7 @@ public class FingerprintFileParser {
                 String name = headerFields.get("name");
                 String floorIdxString = headerFields.get("floorIdx");
                 String floorName = headerFields.get("floorName");
-                ArrayList<String> fingerprintNames = parseStringArrayAttribute(headerFields, "fpNames");
+                ArrayList<String> fingerprintNames = parseStringArrayAttribute(headerFields, "points");
                 ArrayList<Vec3> positions = parseVecArrayAttribute(headerFields, "positions");
 
                 if(name == null || floorIdxString == null || floorName == null || fingerprintNames == null || positions == null) {
