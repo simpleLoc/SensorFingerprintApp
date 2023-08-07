@@ -223,15 +223,15 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(getApplicationContext(), "Cannot close output file!", Toast.LENGTH_LONG).show();
                     return;
                 }
-                Uri path = FileProvider.getUriForFile(MainActivity.this, FILE_PROVIDER_AUTHORITY, fingerprintsFile);
+                //Uri path = FileProvider.getUriForFile(MainActivity.this, FILE_PROVIDER_AUTHORITY, fingerprintsFile);
                 Intent i = new Intent(Intent.ACTION_SEND);
                 i.putExtra(Intent.EXTRA_TEXT, "Share Recording");
-                i.putExtra(Intent.EXTRA_STREAM, path);
+                i.putExtra(Intent.EXTRA_STREAM, outputDoc);
                 i.setType("text/plain");
                 List<ResolveInfo> resInfoList = MainActivity.this.getPackageManager().queryIntentActivities(i, PackageManager.MATCH_DEFAULT_ONLY);
                 for (ResolveInfo resolveInfo : resInfoList) {
                     String packageName = resolveInfo.activityInfo.packageName;
-                    MainActivity.this.grantUriPermission(packageName, path, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    MainActivity.this.grantUriPermission(packageName, outputDoc, Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 }
                 MainActivity.this.startActivity(Intent.createChooser(i, "Share Recording"));
             }
