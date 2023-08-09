@@ -717,6 +717,7 @@ public class MainActivity extends AppCompatActivity {
             startActivity(new Intent(getApplicationContext(), SettingsActivity.class));
         } else {
             selectedFingerprints.clear();
+            mapView.setHighlightFingerprint(null);
             recordingFingerprint = null;
             updateBtnStart();
             setBtnExportEnabled();
