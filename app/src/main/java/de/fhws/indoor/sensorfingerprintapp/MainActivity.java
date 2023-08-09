@@ -13,7 +13,6 @@ import android.net.Uri;
 import android.net.wifi.rtt.RangingRequest;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.CancellationSignal;
 import android.os.Environment;
 import android.os.SystemClock;
 import android.os.VibrationEffect;
@@ -25,7 +24,6 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -33,7 +31,6 @@ import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.FileProvider;
 import androidx.preference.PreferenceManager;
 
 import com.github.mikephil.charting.charts.BarChart;
@@ -50,9 +47,7 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
-import java.time.temporal.ValueRange;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -88,6 +83,7 @@ import de.fhws.indoor.libsmartphonesensors.io.RecordingSession;
 import de.fhws.indoor.libsmartphonesensors.loggers.Logger;
 import de.fhws.indoor.libsmartphonesensors.loggers.TimedOrderedLogger;
 import de.fhws.indoor.libsmartphonesensors.sensors.DecawaveUWB;
+import de.fhws.indoor.libsmartphonesensors.sensors.GroundTruth;
 import de.fhws.indoor.libsmartphonesensors.sensors.WiFi;
 import de.fhws.indoor.libsmartphonesensors.ui.EventCounterView;
 import de.fhws.indoor.libsmartphonesensors.util.permissions.AppCompatMultiPermissionRequester;
@@ -273,7 +269,14 @@ public class MainActivity extends AppCompatActivity {
     ArrayAdapter<String> mFloorNameAdapter;
     private SharedPreferences mPrefs;
 
+    // start button
     private Button btnStart = null;
+    private View.OnClickListener btnStartStartListener = null;
+    private View.OnClickListener btnStartMarkGTListener = null;
+    private View.OnClickListener btnStartStopListener = null;
+    private int groundTruthPressedCnt = 0;
+
+    // other buttons
     private Button btnExport = null;
     private Button btnSettings = null;
     private Button btnStatistics = null;
@@ -407,7 +410,7 @@ public class MainActivity extends AppCompatActivity {
                     mapView.setHighlightFingerprint(fpPath);
                 }
 
-                setBtnStartEnabled();
+                updateBtnStart();
             }
 
             @Override
@@ -442,7 +445,7 @@ public class MainActivity extends AppCompatActivity {
                         mapView.invalidate();
 
                         selectedFingerprints.add(fp);
-                        setBtnStartEnabled();
+                        updateBtnStart();
                     }
                 };
                 dialogCreateFingerprint.setOnCreateListener(onClickListener);
@@ -469,13 +472,24 @@ public class MainActivity extends AppCompatActivity {
         // setup start fingerprinting button
         btnStart = findViewById(R.id.btnStart);
         btnStart.setEnabled(false);
-        btnStart.setOnClickListener((view) -> {
-            if (recordingFingerprint == null) {
-                startRecording();
-            } else {
-                stopRecording();
+        btnStartStartListener = (view) -> {
+            startRecording();
+        };
+        btnStartMarkGTListener = (view) -> {
+            final GroundTruth groundTruth = sensorManager.getSensor(GroundTruth.class);
+            groundTruth.writeGroundTruth(groundTruthPressedCnt++, SystemClock.elapsedRealtimeNanos());
+            updateBtnStart();
+        };
+        btnStartStopListener = (view) -> {
+            // when stopping path write last gt position
+            if (recordingFingerprint instanceof FingerprintPath) {
+                final GroundTruth groundTruth = sensorManager.getSensor(GroundTruth.class);
+                groundTruth.writeGroundTruth(groundTruthPressedCnt++, SystemClock.elapsedRealtimeNanos());
             }
-        });
+            // stop recording
+            stopRecording();
+        };
+        btnStart.setOnClickListener(btnStartStartListener);
 
         // setup settings view
         btnSettings = findViewById(R.id.btnSettings);
@@ -704,7 +718,7 @@ public class MainActivity extends AppCompatActivity {
         } else {
             selectedFingerprints.clear();
             recordingFingerprint = null;
-            setBtnStartEnabled();
+            updateBtnStart();
             setBtnExportEnabled();
             setupSensors();
             // try to recover temporary fingerprint files that were aborted during recording
@@ -752,10 +766,10 @@ public class MainActivity extends AppCompatActivity {
 
             fingerprintFileLocations.startRecording(fromSelectedFingerprints);
 
-            sensorManager.start(this);
-            btnStart.setText(R.string.stop_button_text);
             recordingFingerprint = fromSelectedFingerprints;
+            sensorManager.start(this);
 
+            updateBtnStart();
             setBtnExportEnabled();
             setBtnSettingsEnabled();
 
@@ -809,7 +823,8 @@ public class MainActivity extends AppCompatActivity {
 
             recordingFingerprint = null;
 
-            btnStart.setText(R.string.start_button_text);
+            updateBtnStart();
+            groundTruthPressedCnt = 0;
             setBtnExportEnabled();
             setBtnSettingsEnabled();
 
@@ -826,8 +841,45 @@ public class MainActivity extends AppCompatActivity {
         Toast.makeText(getApplicationContext(), "Recording stopped", Toast.LENGTH_LONG).show();
     }
 
-    private void setBtnStartEnabled() {
-        btnStart.setEnabled(!selectedFingerprints.isEmpty() || selectedFingerprintPath != null);
+    private void updateBtnStart() {
+        // check if currently recording
+        if (recordingFingerprint == null) {
+            // not recording enable/disable button
+            btnStart.setEnabled(!selectedFingerprints.isEmpty() || selectedFingerprintPath != null);
+
+            // check if path is selected and display warm up text if so
+            if (selectedFingerprintPath != null || selectedFingerprints.size() > 1) {
+                btnStart.setText(R.string.start_button_text_warm_up);
+            } else if (!selectedFingerprints.isEmpty()) {
+                btnStart.setText(R.string.start_button_text);
+            }
+
+            // set start recording listener
+            btnStart.setOnClickListener(btnStartStartListener);
+        } else {
+            // recording
+            // check if recording a path,
+            if (recordingFingerprint instanceof FingerprintPath) {
+                // recording a path
+                FingerprintPath recordingPath = (FingerprintPath) recordingFingerprint;
+                if (groundTruthPressedCnt == 0) {
+                    // in warm up phase
+                    btnStart.setOnClickListener(btnStartMarkGTListener);
+                    btnStart.setText(R.string.start_button_text);
+                } else if (groundTruthPressedCnt < recordingPath.positions.size()-1) {
+                    // normal ground truth phase
+                    btnStart.setText(getResources().getString(R.string.start_button_text_gt, groundTruthPressedCnt, recordingPath.positions.size()-1));
+                } else {
+                    // before end point, so display stop
+                    btnStart.setOnClickListener(btnStartStopListener);
+                    btnStart.setText(getResources().getString(R.string.stop_button_text_gt, groundTruthPressedCnt,  recordingPath.positions.size()-1));
+                }
+            } else {
+                // recording at single position
+                btnStart.setOnClickListener(btnStartStopListener);
+                btnStart.setText(R.string.stop_button_text);
+            }
+        }
     }
 
     private void setBtnExportEnabled() {
@@ -852,7 +904,7 @@ public class MainActivity extends AppCompatActivity {
         Toast.makeText(getApplicationContext(), "Fingerprints exported", Toast.LENGTH_LONG).show();
 
         // conditionally enable buttons again
-        setBtnStartEnabled();
+        updateBtnStart();
         setBtnExportEnabled();
         setBtnSettingsEnabled();
     }
