@@ -323,7 +323,7 @@ public class MainActivity extends AppCompatActivity {
 
         // setup map view
         mapView = findViewById(R.id.MapView);
-        mapView.setColorScheme(new ColorScheme(R.color.wallColor, R.color.unseenColor, R.color.seenColor, R.color.selectedColor));
+        mapView.setColorScheme(new ColorScheme(R.color.outlineColor, R.color.outlineRemoveColor, R.color.wallColor, R.color.wallColorConcrete, R.color.wallColorWood, R.color.doorColor, R.color.doorColorLocked, R.color.stairColor, R.color.unseenColor, R.color.seenColor, R.color.selectedColor));
         mPrefs = getSharedPreferences(MAP_PREFERENCES, MODE_PRIVATE);
 
         // configure event counter view
@@ -1109,7 +1109,7 @@ public class MainActivity extends AppCompatActivity {
     private void updateFloorNames() {
         if (currentMap != null) {
             mFloorNameAdapter.clear();
-            currentMap.getFloors().stream().map(Floor::getName).sorted().forEach(s -> mFloorNameAdapter.add(s));
+            currentMap.getFloors().stream().map(Floor::getName).forEach(s -> mFloorNameAdapter.add(s));
         }
     }
 

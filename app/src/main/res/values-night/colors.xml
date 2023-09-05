@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="wallColor">#88FFFFFF</color>
+    <color name="wallColor">#FF777777</color>
+    <color name="wallColorConcrete">#FF555555</color>
+    <color name="wallColorWood">#FFBC8D0B</color>
+    <color name="outlineColor">#FF333333</color>
+    <color name="outlineRemoveColor">#FF111111</color>
     <color name="unseenColor">#CCFF0000</color>
     <color name="seenColor">#FF00FF00</color>
     <color name="selectedColor">#FFEB3B</color>

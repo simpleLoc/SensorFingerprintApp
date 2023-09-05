@@ -7,7 +7,14 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="outlineColor">#FFEEEEEE</color>
+    <color name="outlineRemoveColor">#FFFFFFFF</color>
     <color name="wallColor">#33000000</color>
+    <color name="wallColorConcrete">#77000000</color>
+    <color name="wallColorWood">#FFBC8D0B</color>
+    <color name="doorColor">#FFFFFFFF</color>
+    <color name="doorColorLocked">#FFFF0000</color>
+    <color name="stairColor">#FFAAAAFF</color>
     <color name="unseenColor">#CCFF0000</color>
     <color name="seenColor">#FF00FF00</color>
     <color name="selectedColor">#FFEB3B</color>
