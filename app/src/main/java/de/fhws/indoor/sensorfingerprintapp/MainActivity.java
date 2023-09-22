@@ -405,8 +405,7 @@ public class MainActivity extends AppCompatActivity {
                     Fingerprint selectedFp = selectedFingerprints.get(0);
                     mapView.setHighlightFingerprint(selectedFp);
                 } else {
-                    Fingerprint first = selectedFingerprints.get(0);
-                    FingerprintPath fpPath = new FingerprintPath(first.floorIdx, first.floorName, true, false, selectedFingerprints);
+                    FingerprintPath fpPath = new FingerprintPath(true, false, selectedFingerprints);
                     mapView.setHighlightFingerprint(fpPath);
                 }
 
@@ -759,8 +758,7 @@ public class MainActivity extends AppCompatActivity {
             if (selectedFingerprintPath != null) {
                 fromSelectedFingerprints = selectedFingerprintPath;
             } else if (selectedFingerprints.size() > 1) {
-                FingerprintPosition first = selectedFingerprints.get(0);
-                fromSelectedFingerprints = new FingerprintPath(first.floorIdx, first.floorName, true, false, selectedFingerprints);
+                fromSelectedFingerprints = new FingerprintPath(true, false, selectedFingerprints);
             } else {
                 fromSelectedFingerprints = selectedFingerprints.get(0);
             }
@@ -820,6 +818,7 @@ public class MainActivity extends AppCompatActivity {
             fingerprintFileLocations.stopRecording(recordingFingerprint);
 
             recordingFingerprint.recorded = true;
+            updateRecordedState();
             mapView.invalidate();
 
             recordingFingerprint = null;
@@ -1118,9 +1117,19 @@ public class MainActivity extends AppCompatActivity {
 
         for (FingerprintRecordings.Recording r : fingerprintRecordings.getRecordings().values()) {
             Fingerprint fp = r.getFingerprint();
-            Floor floor = currentMap.getFloors().get(fp.floorIdx);
+            Floor floor = null;
+            String floorName = null;
+            if (fp instanceof FingerprintPosition) {
+                FingerprintPosition fpPos = (FingerprintPosition)fp;
+                floor = currentMap.getFloors().get(fpPos.floorIdx);
+                floorName = fpPos.floorName;
+            } else if (fp instanceof FingerprintPath) {
+                FingerprintPath fpPath = (FingerprintPath)fp;
+                floor = currentMap.getFloors().get(fpPath.floorIdxs.get(0));
+                floorName = fpPath.floorNames.get(0);
+            }
             if (floor == null) {
-                Toast.makeText(getApplicationContext(), "Floor of fingerprint recording not found! Floor name: " + fp.floorName, Toast.LENGTH_LONG).show();
+                Toast.makeText(getApplicationContext(), "Floor of fingerprint recording not found! Floor name: " + floorName, Toast.LENGTH_LONG).show();
                 continue;
             }
 
@@ -1129,6 +1138,7 @@ public class MainActivity extends AppCompatActivity {
                 floorFp.recorded = true;
             } else {
                 // added fingerprint which is only in recording
+                fp.selected = false;
                 floor.addFingerprint(fp);
             }
         }

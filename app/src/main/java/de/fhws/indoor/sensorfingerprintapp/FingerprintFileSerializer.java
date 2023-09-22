@@ -46,8 +46,8 @@ public class FingerprintFileSerializer {
             FingerprintPath fpPath = (FingerprintPath) fingerprint;
             outWriter.write(FingerprintFileParser.FINGERPRINT_PATH_TAG + "\n");
             outWriter.write("name=" + fpPath.name + "\n");
-            outWriter.write("floorIdx=" + fpPath.floorIdx + "\n");
-            outWriter.write("floorName=" + fpPath.floorName + "\n");
+            serializeAttributeVec(outWriter, "floorIdxs", fpPath.floorIdxs);
+            serializeAttributeVec(outWriter, "floorNames", fpPath.floorNames);
             serializeAttributeVec(outWriter, "points", fpPath.fingerprintNames);
             serializeAttributeVec(outWriter, "positions", fpPath.positions, FingerprintFileSerializer::serializeVec3);
         }

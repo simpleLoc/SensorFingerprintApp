@@ -79,27 +79,27 @@ public class FingerprintFileParser {
                 return new FingerprintRecordings.Recording(fpPos, data);
             } else if (type == FingerprintType.PATH) {
                 String name = headerFields.get("name");
-                String floorIdxString = headerFields.get("floorIdx");
-                String floorName = headerFields.get("floorName");
+                ArrayList<Integer> floorIdxs = parseIntArrayAttribute(headerFields, "floorIdxs");
+                ArrayList<String> floorNames = parseStringArrayAttribute(headerFields, "floorNames");
                 ArrayList<String> fingerprintNames = parseStringArrayAttribute(headerFields, "points");
                 ArrayList<Vec3> positions = parseVecArrayAttribute(headerFields, "positions");
 
-                if(name == null || floorIdxString == null || floorName == null || fingerprintNames == null || positions == null) {
+                if(name == null || floorIdxs == null || floorNames == null || fingerprintNames == null || positions == null) {
                     continue; // bail out on this one! Invalid!
                 }
-
-                int floorIdx = Integer.parseInt(floorIdxString);
 
                 ArrayList<FingerprintPosition> fingerprintPositions = new ArrayList<>();
                 for (int i = 0; i < fingerprintNames.size(); ++i) {
                     String fpName = fingerprintNames.get(i);
+                    String floorName = floorNames.get(i);
+                    Integer floorIdx = floorIdxs.get(i);
                     Vec3 position = positions.get(i);
 
                     FingerprintPosition fpPos = new FingerprintPosition(fpName, floorIdx, floorName, false, false, position);
                     fingerprintPositions.add(fpPos);
                 }
 
-                FingerprintPath fpPath = new FingerprintPath(floorIdx, floorName, false, true, fingerprintPositions);
+                FingerprintPath fpPath = new FingerprintPath(false, true, fingerprintPositions);
                 return new FingerprintRecordings.Recording(fpPath, data);
             }
         }
@@ -157,6 +157,16 @@ public class FingerprintFileParser {
         ArrayList<String> result = new ArrayList<>();
         for(int i = 0; i < arrLen; ++i) {
             result.add(headerFields.get(arrayName + "[" + i + "]"));
+        }
+        return result;
+    }
+
+    private ArrayList<Integer> parseIntArrayAttribute(HashMap<String, String> headerFields, String arrayName) {
+        if(!headerFields.containsKey(arrayName + "[]")) { return null; }
+        int arrLen = Integer.parseInt(Objects.requireNonNull(headerFields.get(arrayName + "[]")));
+        ArrayList<Integer> result = new ArrayList<>();
+        for(int i = 0; i < arrLen; ++i) {
+            result.add(Integer.parseInt(Objects.requireNonNull(headerFields.get(arrayName + "[" + i + "]"))));
         }
         return result;
     }
